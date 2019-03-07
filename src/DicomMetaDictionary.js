@@ -27,7 +27,7 @@ class DicomMetaDictionary {
         var cleanedDataset = {};
         Object.keys(dataset).forEach(tag => {
             var data = dataset[tag];
-            if (data.vr == "SQ") {
+            if (data.vr === "SQ") {
                 var cleanedValues = [];
                 Object.keys(data.Value).forEach(index => {
                     cleanedValues.push(
@@ -39,7 +39,7 @@ class DicomMetaDictionary {
                 // remove null characters from strings
                 Object.keys(data.Value).forEach(index => {
                     let dataItem = data.Value[index];
-                    if (dataItem.constructor.name == "String") {
+                    if (dataItem.constructor.name === "String") {
                         data.Value[index] = dataItem.replace(/\0/, "");
                     }
                 });
@@ -56,7 +56,7 @@ class DicomMetaDictionary {
         var namedDataset = {};
         Object.keys(dataset).forEach(tag => {
             var data = dataset[tag];
-            if (data.vr == "SQ") {
+            if (data.vr === "SQ") {
                 var namedValues = [];
                 Object.keys(data.Value).forEach(index => {
                     namedValues.push(
@@ -87,7 +87,7 @@ class DicomMetaDictionary {
         };
         Object.keys(dataset).forEach(tag => {
             var data = dataset[tag];
-            if (data.vr == "SQ") {
+            if (data.vr === "SQ") {
                 // convert sequence to list of values
                 var naturalValues = [];
                 Object.keys(data.Value).forEach(index => {
@@ -102,13 +102,13 @@ class DicomMetaDictionary {
             var naturalName = tag;
             if (entry) {
                 naturalName = entry.name;
-                if (entry.vr == "ox") {
+                if (entry.vr === "ox") {
                     // when the vr is data-dependent, keep track of the original type
                     naturalDataset._vrMap[naturalName] = data.vr;
                 }
             }
             naturalDataset[naturalName] = data.Value;
-            if (naturalDataset[naturalName].length == 1) {
+            if (naturalDataset[naturalName].length === 1) {
                 // only one value is not a list
                 naturalDataset[naturalName] = naturalDataset[naturalName][0];
             }
@@ -131,7 +131,7 @@ class DicomMetaDictionary {
             }
         }
         value = value.map(entry =>
-            entry.constructor.name == "Number" ? String(entry) : entry
+            entry.constructor.name === "Number" ? String(entry) : entry
         );
         return value;
     }
@@ -153,7 +153,7 @@ class DicomMetaDictionary {
                     vr: entry.vr,
                     Value: dataset[naturalName]
                 };
-                if (entry.vr == "ox") {
+                if (entry.vr === "ox") {
                     if (dataset._vrMap && dataset._vrMap[naturalName]) {
                         dataItem.vr = dataset._vrMap[naturalName];
                     } else {
@@ -168,7 +168,7 @@ class DicomMetaDictionary {
                     dataItem.Value
                 );
 
-                if (entry.vr == "SQ") {
+                if (entry.vr === "SQ") {
                     var unnaturalValues = [];
                     for (
                         let datasetIndex = 0;
@@ -204,7 +204,7 @@ class DicomMetaDictionary {
                 unnaturalDataset[tag] = dataItem;
             } else {
                 const validMetaNames = ["_vrMap", "_meta"];
-                if (validMetaNames.indexOf(name) == -1) {
+                if (validMetaNames.indexOf(name) === -1) {
                     log.warn(
                         "Unknown name in dataset",
                         name,
@@ -252,7 +252,7 @@ class DicomMetaDictionary {
         DicomMetaDictionary.nameMap = {};
         Object.keys(DicomMetaDictionary.dictionary).forEach(tag => {
             var dict = DicomMetaDictionary.dictionary[tag];
-            if (dict.version != "PrivateTag") {
+            if (dict.version !== "PrivateTag") {
                 DicomMetaDictionary.nameMap[dict.name] = dict;
             }
         });

@@ -53,9 +53,9 @@ class DicomMessage {
 
     static _normalizeSyntax(syntax) {
         if (
-            syntax == IMPLICIT_LITTLE_ENDIAN ||
-            syntax == EXPLICIT_LITTLE_ENDIAN ||
-            syntax == EXPLICIT_BIG_ENDIAN
+            syntax === IMPLICIT_LITTLE_ENDIAN ||
+            syntax === EXPLICIT_LITTLE_ENDIAN ||
+            syntax === EXPLICIT_BIG_ENDIAN
         ) {
             return syntax;
         } else {
@@ -64,7 +64,7 @@ class DicomMessage {
     }
 
     static isEncapsulated(syntax) {
-        return encapsulatedSyntaxes.indexOf(syntax) != -1;
+        return encapsulatedSyntaxes.indexOf(syntax) !== -1;
     }
 
     static readFile(buffer, options = { ignoreErrors: false }) {
@@ -73,8 +73,8 @@ class DicomMessage {
             useSyntax = EXPLICIT_LITTLE_ENDIAN;
         stream.reset();
         stream.increment(128);
-        if (stream.readString(4) != "DICM") {
-            throw new Error("Invalid a dicom file");
+        if (stream.readString(4) !== "DICM") {
+            throw new Error("Invalid dicom file");
         }
         var el = DicomMessage.readTag(stream, useSyntax),
             metaLength = el.values[0];
@@ -117,12 +117,10 @@ class DicomMessage {
     }
 
     static readTag(stream, syntax) {
-        var implicit = syntax == IMPLICIT_LITTLE_ENDIAN ? true : false,
+        var implicit = syntax === IMPLICIT_LITTLE_ENDIAN,
             isLittleEndian =
-                syntax == IMPLICIT_LITTLE_ENDIAN ||
-                syntax == EXPLICIT_LITTLE_ENDIAN
-                    ? true
-                    : false;
+                syntax === IMPLICIT_LITTLE_ENDIAN ||
+                syntax === EXPLICIT_LITTLE_ENDIAN;
 
         var oldEndian = stream.isLittleEndian;
         stream.setEndian(isLittleEndian);
@@ -141,12 +139,12 @@ class DicomMessage {
                 vrType = elementData.vr;
             } else {
                 //unknown tag
-                if (length == 0xffffffff) {
+                if (length === 0xffffffff) {
                     vrType = "SQ";
                 } else if (tag.isPixelDataTag()) {
                     vrType = "OW";
-                } else if (vrType == "xs") {
-                    vrType = "US";
+                    // } else if (vrType === "xs") { // TODO fix unreachable code if necessary
+                    //     vrType = "US";
                 } else {
                     vrType = "UN";
                 }
@@ -172,11 +170,11 @@ class DicomMessage {
             }
         } else {
             var val = vr.read(stream, length, syntax);
-            if (!vr.isBinary() && singleVRs.indexOf(vr.type) == -1) {
+            if (!vr.isBinary() && singleVRs.indexOf(vr.type) === -1) {
                 values = val.split(String.fromCharCode(0x5c));
-            } else if (vr.type == "SQ") {
+            } else if (vr.type === "SQ") {
                 values = val;
-            } else if (vr.type == "OW" || vr.type == "OB") {
+            } else if (vr.type === "OW" || vr.type === "OB") {
                 values = val;
             } else {
                 values.push(val);

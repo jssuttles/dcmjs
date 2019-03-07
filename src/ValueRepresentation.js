@@ -20,8 +20,7 @@ function readTag(stream) {
     var group = stream.readUint16(),
         element = stream.readUint16();
 
-    var tag = tagFromNumbers(group, element);
-    return tag;
+    return tagFromNumbers(group, element);
 }
 
 var binaryVRs = ["FL", "FD", "SL", "SS", "UL", "US", "AT"],
@@ -31,31 +30,31 @@ var binaryVRs = ["FL", "FD", "SL", "SS", "UL", "US", "AT"],
 class ValueRepresentation {
     constructor(type) {
         this.type = type;
-        this.multi = false;
+        this.padByte = "00";
     }
 
     isBinary() {
-        return binaryVRs.indexOf(this.type) != -1;
+        return binaryVRs.indexOf(this.type) !== -1;
     }
 
     allowMultiple() {
-        return !this.isBinary() && singleVRs.indexOf(this.type) == -1;
+        return !this.isBinary() && singleVRs.indexOf(this.type) === -1;
     }
 
     isExplicit() {
-        return explicitVRs.indexOf(this.type) != -1;
+        return explicitVRs.indexOf(this.type) !== -1;
     }
 
     read(stream, length, syntax) {
         if (this.fixed && this.maxLength) {
             if (!length) return this.defaultValue;
-            if (this.maxLength != length)
+            if (this.maxLength !== length)
                 log.error(
                     "Invalid length for fixed length tag, vr " +
                         this.type +
                         ", length " +
                         this.maxLength +
-                        " != " +
+                        " !== " +
                         length
                 );
         }
@@ -70,7 +69,7 @@ class ValueRepresentation {
         if (!length) return "";
 
         var str = stream.readString(length - 1);
-        if (stream.readUint8() != 0) {
+        if (stream.readUint8() !== 0) {
             stream.increment(-1);
             str += stream.readString(1);
         }
@@ -84,7 +83,7 @@ class ValueRepresentation {
             var zeroLength = this.maxLength - length;
             written += stream.writeHex(this.fillWith.repeat(zeroLength));
             return written;
-        } else if (length == this.maxLength) {
+        } else if (length === this.maxLength) {
             return stream.writeString(value);
         } else {
             throw "Length mismatch";
@@ -171,42 +170,44 @@ class ValueRepresentation {
 
     static createByTypeString(type) {
         var vr = null;
-        if (type == "AE") vr = new ApplicationEntity();
-        else if (type == "AS") vr = new AgeString();
-        else if (type == "AT") vr = new AttributeTag();
-        else if (type == "CS") vr = new CodeString();
-        else if (type == "DA") vr = new DateValue();
-        else if (type == "DS") vr = new DecimalString();
-        else if (type == "DT") vr = new DateTime();
-        else if (type == "FL") vr = new FloatingPointSingle();
-        else if (type == "FD") vr = new FloatingPointDouble();
-        else if (type == "IS") vr = new IntegerString();
-        else if (type == "LO") vr = new LongString();
-        else if (type == "LT") vr = new LongText();
-        else if (type == "OB") vr = new OtherByteString();
-        else if (type == "OD") vr = new OtherDoubleString();
-        else if (type == "OF") vr = new OtherFloatString();
-        else if (type == "OW") vr = new OtherWordString();
-        else if (type == "PN") vr = new PersonName();
-        else if (type == "SH") vr = new ShortString();
-        else if (type == "SL") vr = new SignedLong();
-        else if (type == "SQ") vr = new SequenceOfItems();
-        else if (type == "SS") vr = new SignedShort();
-        else if (type == "ST") vr = new ShortText();
-        else if (type == "TM") vr = new TimeValue();
-        else if (type == "UC") vr = new UnlimitedCharacters();
-        else if (type == "UI") vr = new UniqueIdentifier();
-        else if (type == "UL") vr = new UnsignedLong();
-        else if (type == "UN") vr = new UnknownValue();
-        else if (type == "UR") vr = new UniversalResource();
-        else if (type == "US") vr = new UnsignedShort();
-        else if (type == "UT") vr = new UnlimitedText();
-        else if (type == "ox") {
+        if (type === "AE") vr = new ApplicationEntity();
+        else if (type === "AS") vr = new AgeString();
+        else if (type === "AT") vr = new AttributeTag();
+        else if (type === "CS") vr = new CodeString();
+        else if (type === "DA") vr = new DateValue();
+        else if (type === "DS") vr = new DecimalString();
+        else if (type === "DT") vr = new DateTime();
+        else if (type === "FL") vr = new FloatingPointSingle();
+        else if (type === "FD") vr = new FloatingPointDouble();
+        else if (type === "IS") vr = new IntegerString();
+        else if (type === "LO") vr = new LongString();
+        else if (type === "LT") vr = new LongText();
+        else if (type === "OB") vr = new OtherByteString();
+        else if (type === "OD") vr = new OtherDoubleString();
+        else if (type === "OF") vr = new OtherFloatString();
+        else if (type === "OW") vr = new OtherWordString();
+        // else if (type === "OL") vr = new OtherLongString();
+        // else if (type === "OV") vr = new OtherVeryLongString();
+        else if (type === "PN") vr = new PersonName();
+        else if (type === "SH") vr = new ShortString();
+        else if (type === "SL") vr = new SignedLong();
+        else if (type === "SQ") vr = new SequenceOfItems();
+        else if (type === "SS") vr = new SignedShort();
+        else if (type === "ST") vr = new ShortText();
+        else if (type === "TM") vr = new TimeValue();
+        else if (type === "UC") vr = new UnlimitedCharacters();
+        else if (type === "UI") vr = new UniqueIdentifier();
+        else if (type === "UL") vr = new UnsignedLong();
+        else if (type === "UN") vr = new UnknownValue();
+        else if (type === "UR") vr = new UniversalResource();
+        else if (type === "US") vr = new UnsignedShort();
+        else if (type === "UT") vr = new UnlimitedText();
+        else if (type === "ox") {
             // TODO: determine VR based on context (could be 1 byte pixel data)
             // https://github.com/dgobbi/vtk-dicom/issues/38
             log.error("Invalid vr type " + type + " - using OW");
             vr = new OtherWordString();
-        } else if (type == "xs") {
+        } else if (type === "xs") {
             log.error("Invalid vr type " + type + " - using US");
             vr = new UnsignedShort();
         } else {
@@ -221,6 +222,7 @@ class ValueRepresentation {
 class StringRepresentation extends ValueRepresentation {
     constructor(type) {
         super(type);
+        this.padByte = "20";
     }
 
     readBytes(stream, length) {
@@ -261,7 +263,7 @@ class BinaryRepresentation extends ValueRepresentation {
 
                 for (var j = 0, fragmentStart = 0; j < fragmentsLength; j++) {
                     var fragmentEnd = fragmentStart + fragmentSize;
-                    if (j == fragmentsLength - 1) {
+                    if (j === fragmentsLength - 1) {
                         fragmentEnd = frameStream.size;
                     }
                     var fragStream = new ReadBufferStream(
@@ -301,7 +303,7 @@ class BinaryRepresentation extends ValueRepresentation {
     }
 
     readBytes(stream, length) {
-        if (length == 0xffffffff) {
+        if (length === 0xffffffff) {
             var itemTagValue = Tag.readTag(stream),
                 frames = [];
             if (itemTagValue.is(0xfffee000)) {
@@ -324,7 +326,7 @@ class BinaryRepresentation extends ValueRepresentation {
                     frameOffset = offsets.shift();
 
                 while (nextTag.is(0xfffee000)) {
-                    if (frameOffset == start) {
+                    if (frameOffset === start) {
                         frameOffset = offsets.shift();
                         if (fragmentStream !== null) {
                             frames.push(fragmentStream.buffer);
@@ -357,9 +359,9 @@ class BinaryRepresentation extends ValueRepresentation {
             return frames;
         } else {
             var bytes;
-            /*if (this.type == 'OW') {
+            /*if (this.type === 'OW') {
                 bytes = stream.readUint16Array(length);
-            } else if (this.type == 'OB') {
+            } else if (this.type === 'OB') {
                 bytes = stream.readUint8Array(length);
             }*/
             bytes = stream.more(length).buffer;
@@ -372,8 +374,7 @@ class ApplicationEntity extends StringRepresentation {
     constructor() {
         super("AE");
         this.maxLength = 16;
-        this.padByte = "20";
-        this.fillWith = "20";
+        this.fillWith = "20"; // TODO use writeFilledString
     }
 
     readBytes(stream, length) {
@@ -385,7 +386,6 @@ class CodeString extends StringRepresentation {
     constructor() {
         super("CS");
         this.maxLength = 16;
-        this.padByte = "20";
     }
 
     readBytes(stream, length) {
@@ -398,7 +398,6 @@ class AgeString extends StringRepresentation {
     constructor() {
         super("AS");
         this.maxLength = 4;
-        this.padByte = "20";
         this.fixed = true;
         this.defaultValue = "";
     }
@@ -408,8 +407,6 @@ class AttributeTag extends ValueRepresentation {
     constructor() {
         super("AT");
         this.maxLength = 4;
-        this.valueLength = 4;
-        this.padByte = "00";
         this.fixed = true;
     }
 
@@ -431,9 +428,9 @@ class AttributeTag extends ValueRepresentation {
 class DateValue extends StringRepresentation {
     constructor(value) {
         super("DA", value);
-        this.maxLength = 18;
-        this.padByte = "20";
-        //this.fixed = true;
+        this.maxLength = 8;
+        // this.maxLength = 18; // only in context of query
+        this.fixed = true;
         this.defaultValue = "";
     }
 }
@@ -442,7 +439,6 @@ class DecimalString extends StringRepresentation {
     constructor() {
         super("DS");
         this.maxLength = 16;
-        this.padByte = "20";
     }
 
     readBytes(stream, length) {
@@ -457,7 +453,7 @@ class DateTime extends StringRepresentation {
     constructor() {
         super("DT");
         this.maxLength = 26;
-        this.padByte = "20";
+        // this.maxLength = 54; // only in context of query
     }
 }
 
@@ -465,7 +461,6 @@ class FloatingPointSingle extends ValueRepresentation {
     constructor() {
         super("FL");
         this.maxLength = 4;
-        this.padByte = "00";
         this.fixed = true;
         this.defaultValue = 0.0;
     }
@@ -487,7 +482,6 @@ class FloatingPointDouble extends ValueRepresentation {
     constructor() {
         super("FD");
         this.maxLength = 8;
-        this.padByte = "00";
         this.fixed = true;
         this.defaultValue = 0.0;
     }
@@ -509,7 +503,6 @@ class IntegerString extends StringRepresentation {
     constructor() {
         super("IS");
         this.maxLength = 12;
-        this.padByte = "20";
     }
 
     readBytes(stream, length) {
@@ -522,7 +515,6 @@ class LongString extends StringRepresentation {
     constructor() {
         super("LO");
         this.maxCharLength = 64;
-        this.padByte = "20";
     }
 
     readBytes(stream, length) {
@@ -535,7 +527,6 @@ class LongText extends StringRepresentation {
     constructor() {
         super("LT");
         this.maxCharLength = 10240;
-        this.padByte = "20";
     }
 
     readBytes(stream, length) {
@@ -548,14 +539,15 @@ class PersonName extends StringRepresentation {
     constructor() {
         super("PN");
         this.maxLength = null;
-        this.padByte = "20";
     }
 
     checkLength(value) {
         var cmps = value.split(/\^/);
         for (var i in cmps) {
-            var cmp = cmps[i];
-            if (cmp.length > 64) return false;
+            if (cmps.hasOwnProperty(i)) {
+                var cmp = cmps[i];
+                if (cmp.length > 64) return false;
+            }
         }
         return true;
     }
@@ -570,7 +562,6 @@ class ShortString extends StringRepresentation {
     constructor() {
         super("SH");
         this.maxCharLength = 16;
-        this.padByte = "20";
     }
 
     readBytes(stream, length) {
@@ -583,7 +574,6 @@ class SignedLong extends ValueRepresentation {
     constructor() {
         super("SL");
         this.maxLength = 4;
-        this.padByte = "00";
         this.fixed = true;
         this.defaultValue = 0;
     }
@@ -605,15 +595,14 @@ class SequenceOfItems extends ValueRepresentation {
     constructor() {
         super("SQ");
         this.maxLength = null;
-        this.padByte = "00";
         this.noMultiple = true;
     }
 
     readBytes(stream, sqlength, syntax) {
-        if (sqlength == 0x0) {
+        if (sqlength === 0x0) {
             return []; //contains no dataset
         } else {
-            var undefLength = sqlength == 0xffffffff,
+            var undefLength = sqlength === 0xffffffff,
                 elements = [],
                 read = 0;
 
@@ -626,14 +615,14 @@ class SequenceOfItems extends ValueRepresentation {
                 if (tag.is(0xfffee0dd)) {
                     stream.readUint32();
                     break;
-                } else if (!undefLength && read == sqlength) {
+                } else if (!undefLength && read === sqlength) {
                     break;
                 } else if (tag.is(0xfffee000)) {
                     length = stream.readUint32();
                     read += 4;
                     var itemStream = null,
                         toRead = 0,
-                        undef = length == 0xffffffff;
+                        undef = length === 0xffffffff;
 
                     if (undef) {
                         var stack = 0;
@@ -641,9 +630,9 @@ class SequenceOfItems extends ValueRepresentation {
                         /* eslint-disable-next-line no-constant-condition */
                         while (1) {
                             var g = stream.readUint16();
-                            if (g == 0xfffe) {
+                            if (g === 0xfffe) {
                                 var ge = stream.readUint16();
-                                if (ge == 0xe00d) {
+                                if (ge === 0xe00d) {
                                     stack--;
                                     if (stack < 0) {
                                         stream.increment(4);
@@ -652,7 +641,7 @@ class SequenceOfItems extends ValueRepresentation {
                                     } else {
                                         toRead += 4;
                                     }
-                                } else if (ge == 0xe000) {
+                                } else if (ge === 0xe000) {
                                     stack++;
                                     toRead += 4;
                                 } else {
@@ -676,7 +665,7 @@ class SequenceOfItems extends ValueRepresentation {
                         var items = DicomMessage.read(itemStream, syntax);
                         elements.push(items);
                     }
-                    if (!undefLength && read == sqlength) {
+                    if (!undefLength && read === sqlength) {
                         break;
                     }
                 }
@@ -716,8 +705,6 @@ class SignedShort extends ValueRepresentation {
     constructor() {
         super("SS");
         this.maxLength = 2;
-        this.valueLength = 2;
-        this.padByte = "00";
         this.fixed = true;
         this.defaultValue = 0;
     }
@@ -739,7 +726,6 @@ class ShortText extends StringRepresentation {
     constructor() {
         super("ST");
         this.maxCharLength = 1024;
-        this.padByte = "20";
     }
 
     readBytes(stream, length) {
@@ -752,7 +738,7 @@ class TimeValue extends StringRepresentation {
     constructor() {
         super("TM");
         this.maxLength = 14;
-        this.padByte = "20";
+        // this.maxLength = 28; // only in context of query
     }
 
     readBytes(stream, length) {
@@ -763,9 +749,7 @@ class TimeValue extends StringRepresentation {
 class UnlimitedCharacters extends StringRepresentation {
     constructor() {
         super("UC");
-        this.maxLength = null;
-        this.multi = true;
-        this.padByte = "20";
+        this.maxLength = Math.pow(2, 32) - 2;
     }
 
     readBytes(stream, length) {
@@ -777,7 +761,6 @@ class UnlimitedText extends StringRepresentation {
     constructor() {
         super("UT");
         this.maxLength = null;
-        this.padByte = "20";
     }
 
     readBytes(stream, length) {
@@ -790,7 +773,6 @@ class UnsignedShort extends ValueRepresentation {
     constructor() {
         super("US");
         this.maxLength = 2;
-        this.padByte = "00";
         this.fixed = true;
         this.defaultValue = 0;
     }
@@ -812,7 +794,6 @@ class UnsignedLong extends ValueRepresentation {
     constructor() {
         super("UL");
         this.maxLength = 4;
-        this.padByte = "00";
         this.fixed = true;
         this.defaultValue = 0;
     }
@@ -848,8 +829,7 @@ class UniqueIdentifier extends StringRepresentation {
 class UniversalResource extends StringRepresentation {
     constructor() {
         super("UR");
-        this.maxLength = null;
-        this.padByte = "20";
+        this.maxLength = Math.pow(2, 32) - 2;
     }
 
     readBytes(stream, length) {
@@ -861,7 +841,6 @@ class UnknownValue extends StringRepresentation {
     constructor() {
         super("UN");
         this.maxLength = null;
-        this.padByte = "00";
         this.noMultiple = true;
     }
 
@@ -869,12 +848,27 @@ class UnknownValue extends StringRepresentation {
         return stream.readString(length);
     }
 }
+// TODO implement these
+// class OtherLongString extends BinaryRepresentation {
+//     constructor() {
+//         super("OL");
+//         this.maxLength = null;
+//         this.noMultiple = true;
+//     }
+// }
+//
+// class OtherVeryLongString extends BinaryRepresentation {
+//     constructor() {
+//         super("OV");
+//         this.maxLength = null;
+//         this.noMultiple = true;
+//     }
+// }
 
 class OtherWordString extends BinaryRepresentation {
     constructor() {
         super("OW");
         this.maxLength = null;
-        this.padByte = "00";
         this.noMultiple = true;
     }
 }
@@ -891,8 +885,7 @@ class OtherByteString extends BinaryRepresentation {
 class OtherDoubleString extends BinaryRepresentation {
     constructor() {
         super("OD");
-        this.maxLength = null;
-        this.padByte = "00";
+        this.maxLength = Math.pow(2, 32) - 8;
         this.noMultiple = true;
     }
 }
@@ -900,8 +893,7 @@ class OtherDoubleString extends BinaryRepresentation {
 class OtherFloatString extends BinaryRepresentation {
     constructor() {
         super("OF");
-        this.maxLength = null;
-        this.padByte = "00";
+        this.maxLength = Math.pow(2, 32) - 4;
         this.noMultiple = true;
     }
 }
