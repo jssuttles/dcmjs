@@ -49,7 +49,7 @@ class Tag {
     }
 
     is(t) {
-        return this.value == t;
+        return this.value === t;
     }
 
     group() {
@@ -90,12 +90,10 @@ class Tag {
         var vr = ValueRepresentation.createByTypeString(vrType),
             useSyntax = DicomMessage._normalizeSyntax(syntax);
 
-        var implicit = useSyntax == IMPLICIT_LITTLE_ENDIAN ? true : false,
+        var implicit = useSyntax === IMPLICIT_LITTLE_ENDIAN,
             isLittleEndian =
-                useSyntax == IMPLICIT_LITTLE_ENDIAN ||
-                useSyntax == EXPLICIT_LITTLE_ENDIAN
-                    ? true
-                    : false,
+                useSyntax === IMPLICIT_LITTLE_ENDIAN ||
+                useSyntax === EXPLICIT_LITTLE_ENDIAN,
             isEncapsulated = DicomMessage.isEncapsulated(syntax);
 
         var oldEndian = stream.isLittleEndian;
@@ -108,7 +106,7 @@ class Tag {
             valueLength;
         tagStream.setEndian(isLittleEndian);
 
-        if (vrType == "OW" || vrType == "OB") {
+        if (vrType === "OW" || vrType === "OB") {
             valueLength = vr.writeBytes(
                 tagStream,
                 values,
@@ -119,7 +117,7 @@ class Tag {
             valueLength = vr.writeBytes(tagStream, values, useSyntax);
         }
 
-        if (vrType == "SQ") {
+        if (vrType === "SQ") {
             valueLength = 0xffffffff;
         }
         var written = tagStream.size + 4;
