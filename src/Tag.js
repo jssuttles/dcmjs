@@ -106,12 +106,13 @@ class Tag {
             valueLength;
         tagStream.setEndian(isLittleEndian);
 
-        if (vrType === "OW" || vrType === "OB") {
+        if (["OB", "OW"].includes(vrType)) {
             valueLength = vr.writeBytes(
                 tagStream,
                 values,
                 useSyntax,
-                isEncapsulated
+                isEncapsulated,
+                this.isPixelDataTag()
             );
         } else {
             valueLength = vr.writeBytes(tagStream, values, useSyntax);
@@ -129,8 +130,12 @@ class Tag {
             if (vr.isExplicit()) {
                 stream.writeString(vr.type);
                 stream.writeHex("0000");
-                stream.writeUint32(valueLength);
-                written += 8;
+                if (valueLength !== 0xffffffff || !["OB", "OW"].includes(vrType) || this.isPixelDataTag()) {
+                    stream.writeUint32(valueLength);
+                    written += 8;
+                } else {
+                    written += 4;
+                }
             } else {
                 stream.writeString(vr.type);
                 stream.writeUint16(valueLength);

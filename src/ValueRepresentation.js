@@ -241,11 +241,11 @@ class BinaryRepresentation extends ValueRepresentation {
         super(type);
     }
 
-    writeBytes(stream, value, syntax, isEncapsulated) {
+    writeBytes(stream, value, syntax, isEncapsulated, isPixelDataTag) {
         var i;
         var binaryStream;
         if (isEncapsulated) {
-            var fragmentSize = 1024 * 20,
+            var fragmentSize = 1024 * 1024 * 20,
                 frames = value.length,
                 startOffset = [];
 
@@ -257,9 +257,9 @@ class BinaryRepresentation extends ValueRepresentation {
                 startOffset.push(binaryStream.size);
                 var frameBuffer = value[i],
                     frameStream = new ReadBufferStream(frameBuffer),
-                    fragmentsLength = Math.ceil(
+                    fragmentsLength = isPixelDataTag ? Math.ceil(
                         frameStream.size / fragmentSize
-                    );
+                    ) : 1;
 
                 for (var j = 0, fragmentStart = 0; j < fragmentsLength; j++) {
                     var fragmentEnd = fragmentStart + fragmentSize;
@@ -270,23 +270,31 @@ class BinaryRepresentation extends ValueRepresentation {
                         frameStream.getBuffer(fragmentStart, fragmentEnd)
                     );
                     fragmentStart = fragmentEnd;
-                    binaryStream.writeUint16(0xfffe);
-                    binaryStream.writeUint16(0xe000);
+                    if (isPixelDataTag) {
+                        binaryStream.writeUint16(0xfffe);
+                        binaryStream.writeUint16(0xe000);
+                    }
                     binaryStream.writeUint32(fragStream.size);
                     binaryStream.concat(fragStream);
                 }
             }
 
-            stream.writeUint16(0xfffe);
-            stream.writeUint16(0xe000);
-            stream.writeUint32(startOffset.length * 4);
-            for (i = 0; i < startOffset.length; i++) {
-                stream.writeUint32(startOffset[i]);
+            if (isPixelDataTag) {
+                stream.writeUint16(0xfffe);
+                stream.writeUint16(0xe000);
+                stream.writeUint32(startOffset.length * 4);
+                for (i = 0; i < startOffset.length; i++) {
+                    stream.writeUint32(startOffset[i]);
+                }
             }
+
             stream.concat(binaryStream);
-            stream.writeUint16(0xfffe);
-            stream.writeUint16(0xe0dd);
-            stream.writeUint32(0x0);
+            if (isPixelDataTag) {
+                stream.writeUint16(0xfffe);
+                stream.writeUint16(0xe0dd);
+                stream.writeUint32(0x0);
+            }
+
             var written = 8 + binaryStream.size + startOffset.length * 4 + 8;
             if (written & 1) {
                 stream.writeHex(this.padByte);
@@ -837,15 +845,11 @@ class UniversalResource extends StringRepresentation {
     }
 }
 
-class UnknownValue extends StringRepresentation {
+class UnknownValue extends BinaryRepresentation {
     constructor() {
         super("UN");
         this.maxLength = null;
         this.noMultiple = true;
-    }
-
-    readBytes(stream, length) {
-        return stream.readString(length);
     }
 }
 // TODO implement these

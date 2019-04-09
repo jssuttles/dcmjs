@@ -172,9 +172,7 @@ class DicomMessage {
             var val = vr.read(stream, length, syntax);
             if (!vr.isBinary() && singleVRs.indexOf(vr.type) === -1) {
                 values = val.split(String.fromCharCode(0x5c));
-            } else if (vr.type === "SQ") {
-                values = val;
-            } else if (vr.type === "OW" || vr.type === "OB") {
+            } else if (["SQ", "OW", "OB", "UN"].includes(vr.type)) {
                 values = val;
             } else {
                 values.push(val);
