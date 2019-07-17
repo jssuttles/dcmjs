@@ -998,12 +998,27 @@
 	  }, {
 	    key: "read",
 	    value: function read(stream, length, syntax) {
+	      var _this = this;
+
 	      if (this.fixed && this.maxLength) {
 	        if (!length) return this.defaultValue;
-	        if (this.maxLength !== length) lib.error("Invalid length for fixed length tag, vr " + this.type + ", length " + this.maxLength + " !== " + length);
 	      }
 
-	      return this.readBytes(stream, length, syntax);
+	      var val = this.readBytes(stream, length, syntax);
+
+	      if (this.fixed && this.maxLength && this.maxLength !== length) {
+	        if (!this.noMultiple && typeof val === 'string' && val.includes(String.fromCharCode(0x5c))) {
+	          if (val.split(String.fromCharCode(0x5c)).some(function (string) {
+	            return string.length !== _this.maxLength;
+	          })) {
+	            lib.error("Invalid length for fixed length tag, vr " + this.type + ", length " + this.maxLength + " !== " + length);
+	          }
+	        } else {
+	          lib.error("Invalid length for fixed length tag, vr " + this.type + ", length " + this.maxLength + " !== " + length);
+	        }
+	      }
+
+	      return val;
 	    }
 	  }, {
 	    key: "readBytes",
@@ -1151,13 +1166,13 @@
 	  _inherits(StringRepresentation, _ValueRepresentation);
 
 	  function StringRepresentation(type) {
-	    var _this;
+	    var _this2;
 
 	    _classCallCheck(this, StringRepresentation);
 
-	    _this = _possibleConstructorReturn(this, _getPrototypeOf(StringRepresentation).call(this, type));
-	    _this.padByte = "20";
-	    return _this;
+	    _this2 = _possibleConstructorReturn(this, _getPrototypeOf(StringRepresentation).call(this, type));
+	    _this2.padByte = "20";
+	    return _this2;
 	  }
 
 	  _createClass(StringRepresentation, [{
@@ -1344,15 +1359,15 @@
 	  _inherits(ApplicationEntity, _StringRepresentation);
 
 	  function ApplicationEntity() {
-	    var _this2;
+	    var _this3;
 
 	    _classCallCheck(this, ApplicationEntity);
 
-	    _this2 = _possibleConstructorReturn(this, _getPrototypeOf(ApplicationEntity).call(this, "AE"));
-	    _this2.maxLength = 16;
-	    _this2.fillWith = "20"; // TODO use writeFilledString
+	    _this3 = _possibleConstructorReturn(this, _getPrototypeOf(ApplicationEntity).call(this, "AE"));
+	    _this3.maxLength = 16;
+	    _this3.fillWith = "20"; // TODO use writeFilledString
 
-	    return _this2;
+	    return _this3;
 	  }
 
 	  _createClass(ApplicationEntity, [{
@@ -1371,13 +1386,13 @@
 	  _inherits(CodeString, _StringRepresentation2);
 
 	  function CodeString() {
-	    var _this3;
+	    var _this4;
 
 	    _classCallCheck(this, CodeString);
 
-	    _this3 = _possibleConstructorReturn(this, _getPrototypeOf(CodeString).call(this, "CS"));
-	    _this3.maxLength = 16;
-	    return _this3;
+	    _this4 = _possibleConstructorReturn(this, _getPrototypeOf(CodeString).call(this, "CS"));
+	    _this4.maxLength = 16;
+	    return _this4;
 	  }
 
 	  _createClass(CodeString, [{
@@ -1397,15 +1412,15 @@
 	  _inherits(AgeString, _StringRepresentation3);
 
 	  function AgeString() {
-	    var _this4;
+	    var _this5;
 
 	    _classCallCheck(this, AgeString);
 
-	    _this4 = _possibleConstructorReturn(this, _getPrototypeOf(AgeString).call(this, "AS"));
-	    _this4.maxLength = 4;
-	    _this4.fixed = true;
-	    _this4.defaultValue = "";
-	    return _this4;
+	    _this5 = _possibleConstructorReturn(this, _getPrototypeOf(AgeString).call(this, "AS"));
+	    _this5.maxLength = 4;
+	    _this5.fixed = true;
+	    _this5.defaultValue = "";
+	    return _this5;
 	  }
 
 	  return AgeString;
@@ -1417,14 +1432,14 @@
 	  _inherits(AttributeTag, _ValueRepresentation3);
 
 	  function AttributeTag() {
-	    var _this5;
+	    var _this6;
 
 	    _classCallCheck(this, AttributeTag);
 
-	    _this5 = _possibleConstructorReturn(this, _getPrototypeOf(AttributeTag).call(this, "AT"));
-	    _this5.maxLength = 4;
-	    _this5.fixed = true;
-	    return _this5;
+	    _this6 = _possibleConstructorReturn(this, _getPrototypeOf(AttributeTag).call(this, "AT"));
+	    _this6.maxLength = 4;
+	    _this6.fixed = true;
+	    return _this6;
 	  }
 
 	  _createClass(AttributeTag, [{
@@ -1450,17 +1465,24 @@
 	  _inherits(DateValue, _StringRepresentation4);
 
 	  function DateValue(value) {
-	    var _this6;
+	    var _this7;
 
 	    _classCallCheck(this, DateValue);
 
-	    _this6 = _possibleConstructorReturn(this, _getPrototypeOf(DateValue).call(this, "DA", value));
-	    _this6.maxLength = 8; // this.maxLength = 18; // only in context of query
+	    _this7 = _possibleConstructorReturn(this, _getPrototypeOf(DateValue).call(this, "DA", value));
+	    _this7.maxLength = 8; // this.maxLength = 18; // only in context of query
 
-	    _this6.fixed = true;
-	    _this6.defaultValue = "";
-	    return _this6;
+	    _this7.fixed = true;
+	    _this7.defaultValue = "";
+	    return _this7;
 	  }
+
+	  _createClass(DateValue, [{
+	    key: "readBytes",
+	    value: function readBytes(stream, length) {
+	      return _get(_getPrototypeOf(DateValue.prototype), "readBytes", this).call(this, stream, length).trim();
+	    }
+	  }]);
 
 	  return DateValue;
 	}(StringRepresentation);
@@ -1471,13 +1493,13 @@
 	  _inherits(DecimalString, _StringRepresentation5);
 
 	  function DecimalString() {
-	    var _this7;
+	    var _this8;
 
 	    _classCallCheck(this, DecimalString);
 
-	    _this7 = _possibleConstructorReturn(this, _getPrototypeOf(DecimalString).call(this, "DS"));
-	    _this7.maxLength = 16;
-	    return _this7;
+	    _this8 = _possibleConstructorReturn(this, _getPrototypeOf(DecimalString).call(this, "DS"));
+	    _this8.maxLength = 16;
+	    return _this8;
 	  }
 
 	  _createClass(DecimalString, [{
@@ -1499,14 +1521,14 @@
 	  _inherits(DateTime, _StringRepresentation6);
 
 	  function DateTime() {
-	    var _this8;
+	    var _this9;
 
 	    _classCallCheck(this, DateTime);
 
-	    _this8 = _possibleConstructorReturn(this, _getPrototypeOf(DateTime).call(this, "DT"));
-	    _this8.maxLength = 26; // this.maxLength = 54; // only in context of query
+	    _this9 = _possibleConstructorReturn(this, _getPrototypeOf(DateTime).call(this, "DT"));
+	    _this9.maxLength = 26; // this.maxLength = 54; // only in context of query
 
-	    return _this8;
+	    return _this9;
 	  }
 
 	  return DateTime;
@@ -1518,15 +1540,15 @@
 	  _inherits(FloatingPointSingle, _ValueRepresentation4);
 
 	  function FloatingPointSingle() {
-	    var _this9;
+	    var _this10;
 
 	    _classCallCheck(this, FloatingPointSingle);
 
-	    _this9 = _possibleConstructorReturn(this, _getPrototypeOf(FloatingPointSingle).call(this, "FL"));
-	    _this9.maxLength = 4;
-	    _this9.fixed = true;
-	    _this9.defaultValue = 0.0;
-	    return _this9;
+	    _this10 = _possibleConstructorReturn(this, _getPrototypeOf(FloatingPointSingle).call(this, "FL"));
+	    _this10.maxLength = 4;
+	    _this10.fixed = true;
+	    _this10.defaultValue = 0.0;
+	    return _this10;
 	  }
 
 	  _createClass(FloatingPointSingle, [{
@@ -1550,15 +1572,15 @@
 	  _inherits(FloatingPointDouble, _ValueRepresentation5);
 
 	  function FloatingPointDouble() {
-	    var _this10;
+	    var _this11;
 
 	    _classCallCheck(this, FloatingPointDouble);
 
-	    _this10 = _possibleConstructorReturn(this, _getPrototypeOf(FloatingPointDouble).call(this, "FD"));
-	    _this10.maxLength = 8;
-	    _this10.fixed = true;
-	    _this10.defaultValue = 0.0;
-	    return _this10;
+	    _this11 = _possibleConstructorReturn(this, _getPrototypeOf(FloatingPointDouble).call(this, "FD"));
+	    _this11.maxLength = 8;
+	    _this11.fixed = true;
+	    _this11.defaultValue = 0.0;
+	    return _this11;
 	  }
 
 	  _createClass(FloatingPointDouble, [{
@@ -1582,13 +1604,13 @@
 	  _inherits(IntegerString, _StringRepresentation7);
 
 	  function IntegerString() {
-	    var _this11;
+	    var _this12;
 
 	    _classCallCheck(this, IntegerString);
 
-	    _this11 = _possibleConstructorReturn(this, _getPrototypeOf(IntegerString).call(this, "IS"));
-	    _this11.maxLength = 12;
-	    return _this11;
+	    _this12 = _possibleConstructorReturn(this, _getPrototypeOf(IntegerString).call(this, "IS"));
+	    _this12.maxLength = 12;
+	    return _this12;
 	  }
 
 	  _createClass(IntegerString, [{
@@ -1608,13 +1630,13 @@
 	  _inherits(LongString, _StringRepresentation8);
 
 	  function LongString() {
-	    var _this12;
+	    var _this13;
 
 	    _classCallCheck(this, LongString);
 
-	    _this12 = _possibleConstructorReturn(this, _getPrototypeOf(LongString).call(this, "LO"));
-	    _this12.maxCharLength = 64;
-	    return _this12;
+	    _this13 = _possibleConstructorReturn(this, _getPrototypeOf(LongString).call(this, "LO"));
+	    _this13.maxCharLength = 64;
+	    return _this13;
 	  }
 
 	  _createClass(LongString, [{
@@ -1634,13 +1656,13 @@
 	  _inherits(LongText, _StringRepresentation9);
 
 	  function LongText() {
-	    var _this13;
+	    var _this14;
 
 	    _classCallCheck(this, LongText);
 
-	    _this13 = _possibleConstructorReturn(this, _getPrototypeOf(LongText).call(this, "LT"));
-	    _this13.maxCharLength = 10240;
-	    return _this13;
+	    _this14 = _possibleConstructorReturn(this, _getPrototypeOf(LongText).call(this, "LT"));
+	    _this14.maxCharLength = 10240;
+	    return _this14;
 	  }
 
 	  _createClass(LongText, [{
@@ -1660,13 +1682,13 @@
 	  _inherits(PersonName, _StringRepresentation10);
 
 	  function PersonName() {
-	    var _this14;
+	    var _this15;
 
 	    _classCallCheck(this, PersonName);
 
-	    _this14 = _possibleConstructorReturn(this, _getPrototypeOf(PersonName).call(this, "PN"));
-	    _this14.maxLength = null;
-	    return _this14;
+	    _this15 = _possibleConstructorReturn(this, _getPrototypeOf(PersonName).call(this, "PN"));
+	    _this15.maxLength = null;
+	    return _this15;
 	  }
 
 	  _createClass(PersonName, [{
@@ -1700,13 +1722,13 @@
 	  _inherits(ShortString, _StringRepresentation11);
 
 	  function ShortString() {
-	    var _this15;
+	    var _this16;
 
 	    _classCallCheck(this, ShortString);
 
-	    _this15 = _possibleConstructorReturn(this, _getPrototypeOf(ShortString).call(this, "SH"));
-	    _this15.maxCharLength = 16;
-	    return _this15;
+	    _this16 = _possibleConstructorReturn(this, _getPrototypeOf(ShortString).call(this, "SH"));
+	    _this16.maxCharLength = 16;
+	    return _this16;
 	  }
 
 	  _createClass(ShortString, [{
@@ -1726,15 +1748,15 @@
 	  _inherits(SignedLong, _ValueRepresentation6);
 
 	  function SignedLong() {
-	    var _this16;
+	    var _this17;
 
 	    _classCallCheck(this, SignedLong);
 
-	    _this16 = _possibleConstructorReturn(this, _getPrototypeOf(SignedLong).call(this, "SL"));
-	    _this16.maxLength = 4;
-	    _this16.fixed = true;
-	    _this16.defaultValue = 0;
-	    return _this16;
+	    _this17 = _possibleConstructorReturn(this, _getPrototypeOf(SignedLong).call(this, "SL"));
+	    _this17.maxLength = 4;
+	    _this17.fixed = true;
+	    _this17.defaultValue = 0;
+	    return _this17;
 	  }
 
 	  _createClass(SignedLong, [{
@@ -1758,14 +1780,14 @@
 	  _inherits(SequenceOfItems, _ValueRepresentation7);
 
 	  function SequenceOfItems() {
-	    var _this17;
+	    var _this18;
 
 	    _classCallCheck(this, SequenceOfItems);
 
-	    _this17 = _possibleConstructorReturn(this, _getPrototypeOf(SequenceOfItems).call(this, "SQ"));
-	    _this17.maxLength = null;
-	    _this17.noMultiple = true;
-	    return _this17;
+	    _this18 = _possibleConstructorReturn(this, _getPrototypeOf(SequenceOfItems).call(this, "SQ"));
+	    _this18.maxLength = null;
+	    _this18.noMultiple = true;
+	    return _this18;
 	  }
 
 	  _createClass(SequenceOfItems, [{
@@ -1897,15 +1919,15 @@
 	  _inherits(SignedShort, _ValueRepresentation8);
 
 	  function SignedShort() {
-	    var _this18;
+	    var _this19;
 
 	    _classCallCheck(this, SignedShort);
 
-	    _this18 = _possibleConstructorReturn(this, _getPrototypeOf(SignedShort).call(this, "SS"));
-	    _this18.maxLength = 2;
-	    _this18.fixed = true;
-	    _this18.defaultValue = 0;
-	    return _this18;
+	    _this19 = _possibleConstructorReturn(this, _getPrototypeOf(SignedShort).call(this, "SS"));
+	    _this19.maxLength = 2;
+	    _this19.fixed = true;
+	    _this19.defaultValue = 0;
+	    return _this19;
 	  }
 
 	  _createClass(SignedShort, [{
@@ -1929,13 +1951,13 @@
 	  _inherits(ShortText, _StringRepresentation12);
 
 	  function ShortText() {
-	    var _this19;
+	    var _this20;
 
 	    _classCallCheck(this, ShortText);
 
-	    _this19 = _possibleConstructorReturn(this, _getPrototypeOf(ShortText).call(this, "ST"));
-	    _this19.maxCharLength = 1024;
-	    return _this19;
+	    _this20 = _possibleConstructorReturn(this, _getPrototypeOf(ShortText).call(this, "ST"));
+	    _this20.maxCharLength = 1024;
+	    return _this20;
 	  }
 
 	  _createClass(ShortText, [{
@@ -1955,14 +1977,14 @@
 	  _inherits(TimeValue, _StringRepresentation13);
 
 	  function TimeValue() {
-	    var _this20;
+	    var _this21;
 
 	    _classCallCheck(this, TimeValue);
 
-	    _this20 = _possibleConstructorReturn(this, _getPrototypeOf(TimeValue).call(this, "TM"));
-	    _this20.maxLength = 14; // this.maxLength = 28; // only in context of query
+	    _this21 = _possibleConstructorReturn(this, _getPrototypeOf(TimeValue).call(this, "TM"));
+	    _this21.maxLength = 14; // this.maxLength = 28; // only in context of query
 
-	    return _this20;
+	    return _this21;
 	  }
 
 	  _createClass(TimeValue, [{
@@ -1981,13 +2003,13 @@
 	  _inherits(UnlimitedCharacters, _StringRepresentation14);
 
 	  function UnlimitedCharacters() {
-	    var _this21;
+	    var _this22;
 
 	    _classCallCheck(this, UnlimitedCharacters);
 
-	    _this21 = _possibleConstructorReturn(this, _getPrototypeOf(UnlimitedCharacters).call(this, "UC"));
-	    _this21.maxLength = Math.pow(2, 32) - 2;
-	    return _this21;
+	    _this22 = _possibleConstructorReturn(this, _getPrototypeOf(UnlimitedCharacters).call(this, "UC"));
+	    _this22.maxLength = Math.pow(2, 32) - 2;
+	    return _this22;
 	  }
 
 	  _createClass(UnlimitedCharacters, [{
@@ -2006,13 +2028,13 @@
 	  _inherits(UnlimitedText, _StringRepresentation15);
 
 	  function UnlimitedText() {
-	    var _this22;
+	    var _this23;
 
 	    _classCallCheck(this, UnlimitedText);
 
-	    _this22 = _possibleConstructorReturn(this, _getPrototypeOf(UnlimitedText).call(this, "UT"));
-	    _this22.maxLength = null;
-	    return _this22;
+	    _this23 = _possibleConstructorReturn(this, _getPrototypeOf(UnlimitedText).call(this, "UT"));
+	    _this23.maxLength = null;
+	    return _this23;
 	  }
 
 	  _createClass(UnlimitedText, [{
@@ -2032,15 +2054,15 @@
 	  _inherits(UnsignedShort, _ValueRepresentation9);
 
 	  function UnsignedShort() {
-	    var _this23;
+	    var _this24;
 
 	    _classCallCheck(this, UnsignedShort);
 
-	    _this23 = _possibleConstructorReturn(this, _getPrototypeOf(UnsignedShort).call(this, "US"));
-	    _this23.maxLength = 2;
-	    _this23.fixed = true;
-	    _this23.defaultValue = 0;
-	    return _this23;
+	    _this24 = _possibleConstructorReturn(this, _getPrototypeOf(UnsignedShort).call(this, "US"));
+	    _this24.maxLength = 2;
+	    _this24.fixed = true;
+	    _this24.defaultValue = 0;
+	    return _this24;
 	  }
 
 	  _createClass(UnsignedShort, [{
@@ -2064,15 +2086,15 @@
 	  _inherits(UnsignedLong, _ValueRepresentation10);
 
 	  function UnsignedLong() {
-	    var _this24;
+	    var _this25;
 
 	    _classCallCheck(this, UnsignedLong);
 
-	    _this24 = _possibleConstructorReturn(this, _getPrototypeOf(UnsignedLong).call(this, "UL"));
-	    _this24.maxLength = 4;
-	    _this24.fixed = true;
-	    _this24.defaultValue = 0;
-	    return _this24;
+	    _this25 = _possibleConstructorReturn(this, _getPrototypeOf(UnsignedLong).call(this, "UL"));
+	    _this25.maxLength = 4;
+	    _this25.fixed = true;
+	    _this25.defaultValue = 0;
+	    return _this25;
 	  }
 
 	  _createClass(UnsignedLong, [{
@@ -2096,14 +2118,14 @@
 	  _inherits(UniqueIdentifier, _StringRepresentation16);
 
 	  function UniqueIdentifier() {
-	    var _this25;
+	    var _this26;
 
 	    _classCallCheck(this, UniqueIdentifier);
 
-	    _this25 = _possibleConstructorReturn(this, _getPrototypeOf(UniqueIdentifier).call(this, "UI"));
-	    _this25.maxLength = 64;
-	    _this25.padByte = "00";
-	    return _this25;
+	    _this26 = _possibleConstructorReturn(this, _getPrototypeOf(UniqueIdentifier).call(this, "UI"));
+	    _this26.maxLength = 64;
+	    _this26.padByte = "00";
+	    return _this26;
 	  }
 
 	  _createClass(UniqueIdentifier, [{
@@ -2122,13 +2144,13 @@
 	  _inherits(UniversalResource, _StringRepresentation17);
 
 	  function UniversalResource() {
-	    var _this26;
+	    var _this27;
 
 	    _classCallCheck(this, UniversalResource);
 
-	    _this26 = _possibleConstructorReturn(this, _getPrototypeOf(UniversalResource).call(this, "UR"));
-	    _this26.maxLength = Math.pow(2, 32) - 2;
-	    return _this26;
+	    _this27 = _possibleConstructorReturn(this, _getPrototypeOf(UniversalResource).call(this, "UR"));
+	    _this27.maxLength = Math.pow(2, 32) - 2;
+	    return _this27;
 	  }
 
 	  _createClass(UniversalResource, [{
@@ -2147,14 +2169,14 @@
 	  _inherits(UnknownValue, _BinaryRepresentation);
 
 	  function UnknownValue() {
-	    var _this27;
+	    var _this28;
 
 	    _classCallCheck(this, UnknownValue);
 
-	    _this27 = _possibleConstructorReturn(this, _getPrototypeOf(UnknownValue).call(this, "UN"));
-	    _this27.maxLength = null;
-	    _this27.noMultiple = true;
-	    return _this27;
+	    _this28 = _possibleConstructorReturn(this, _getPrototypeOf(UnknownValue).call(this, "UN"));
+	    _this28.maxLength = null;
+	    _this28.noMultiple = true;
+	    return _this28;
 	  }
 
 	  return UnknownValue;
@@ -2182,14 +2204,14 @@
 	  _inherits(OtherWordString, _BinaryRepresentation2);
 
 	  function OtherWordString() {
-	    var _this28;
+	    var _this29;
 
 	    _classCallCheck(this, OtherWordString);
 
-	    _this28 = _possibleConstructorReturn(this, _getPrototypeOf(OtherWordString).call(this, "OW"));
-	    _this28.maxLength = null;
-	    _this28.noMultiple = true;
-	    return _this28;
+	    _this29 = _possibleConstructorReturn(this, _getPrototypeOf(OtherWordString).call(this, "OW"));
+	    _this29.maxLength = null;
+	    _this29.noMultiple = true;
+	    return _this29;
 	  }
 
 	  return OtherWordString;
@@ -2201,15 +2223,15 @@
 	  _inherits(OtherByteString, _BinaryRepresentation3);
 
 	  function OtherByteString() {
-	    var _this29;
+	    var _this30;
 
 	    _classCallCheck(this, OtherByteString);
 
-	    _this29 = _possibleConstructorReturn(this, _getPrototypeOf(OtherByteString).call(this, "OB"));
-	    _this29.maxLength = null;
-	    _this29.padByte = "00";
-	    _this29.noMultiple = true;
-	    return _this29;
+	    _this30 = _possibleConstructorReturn(this, _getPrototypeOf(OtherByteString).call(this, "OB"));
+	    _this30.maxLength = null;
+	    _this30.padByte = "00";
+	    _this30.noMultiple = true;
+	    return _this30;
 	  }
 
 	  return OtherByteString;
@@ -2221,14 +2243,14 @@
 	  _inherits(OtherDoubleString, _BinaryRepresentation4);
 
 	  function OtherDoubleString() {
-	    var _this30;
+	    var _this31;
 
 	    _classCallCheck(this, OtherDoubleString);
 
-	    _this30 = _possibleConstructorReturn(this, _getPrototypeOf(OtherDoubleString).call(this, "OD"));
-	    _this30.maxLength = Math.pow(2, 32) - 8;
-	    _this30.noMultiple = true;
-	    return _this30;
+	    _this31 = _possibleConstructorReturn(this, _getPrototypeOf(OtherDoubleString).call(this, "OD"));
+	    _this31.maxLength = Math.pow(2, 32) - 8;
+	    _this31.noMultiple = true;
+	    return _this31;
 	  }
 
 	  return OtherDoubleString;
@@ -2240,14 +2262,14 @@
 	  _inherits(OtherFloatString, _BinaryRepresentation5);
 
 	  function OtherFloatString() {
-	    var _this31;
+	    var _this32;
 
 	    _classCallCheck(this, OtherFloatString);
 
-	    _this31 = _possibleConstructorReturn(this, _getPrototypeOf(OtherFloatString).call(this, "OF"));
-	    _this31.maxLength = Math.pow(2, 32) - 4;
-	    _this31.noMultiple = true;
-	    return _this31;
+	    _this32 = _possibleConstructorReturn(this, _getPrototypeOf(OtherFloatString).call(this, "OF"));
+	    _this32.maxLength = Math.pow(2, 32) - 4;
+	    _this32.noMultiple = true;
+	    return _this32;
 	  }
 
 	  return OtherFloatString;
@@ -2857,7 +2879,7 @@
 	        var val = vr.read(stream, length, syntax);
 
 	        if (!vr.isBinary() && singleVRs$1.indexOf(vr.type) === -1) {
-	          values = val.split(String.fromCharCode(0x5c));
+	          values = val.split(String.fromCharCode(0x5c)); // split on backslash
 	        } else if (["SQ", "OW", "OB", "UN"].includes(vr.type)) {
 	          values = val;
 	        } else {

@@ -48,7 +48,29 @@ class ValueRepresentation {
     read(stream, length, syntax) {
         if (this.fixed && this.maxLength) {
             if (!length) return this.defaultValue;
-            if (this.maxLength !== length)
+        }
+        var val = this.readBytes(stream, length, syntax);
+        if (this.fixed && this.maxLength && this.maxLength !== length) {
+            if (
+                !this.noMultiple &&
+                typeof val === "string" &&
+                val.includes(String.fromCharCode(0x5c))
+            ) {
+                if (
+                    val
+                        .split(String.fromCharCode(0x5c))
+                        .some(string => string.length !== this.maxLength)
+                ) {
+                    log.error(
+                        "Invalid length for fixed length tag, vr " +
+                            this.type +
+                            ", length " +
+                            this.maxLength +
+                            " !== " +
+                            length
+                    );
+                }
+            } else {
                 log.error(
                     "Invalid length for fixed length tag, vr " +
                         this.type +
@@ -57,8 +79,9 @@ class ValueRepresentation {
                         " !== " +
                         length
                 );
+            }
         }
-        return this.readBytes(stream, length, syntax);
+        return val;
     }
 
     readBytes(stream, length) {
@@ -257,9 +280,9 @@ class BinaryRepresentation extends ValueRepresentation {
                 startOffset.push(binaryStream.size);
                 var frameBuffer = value[i],
                     frameStream = new ReadBufferStream(frameBuffer),
-                    fragmentsLength = isPixelDataTag ? Math.ceil(
-                        frameStream.size / fragmentSize
-                    ) : 1;
+                    fragmentsLength = isPixelDataTag
+                        ? Math.ceil(frameStream.size / fragmentSize)
+                        : 1;
 
                 for (var j = 0, fragmentStart = 0; j < fragmentsLength; j++) {
                     var fragmentEnd = fragmentStart + fragmentSize;
@@ -440,6 +463,10 @@ class DateValue extends StringRepresentation {
         // this.maxLength = 18; // only in context of query
         this.fixed = true;
         this.defaultValue = "";
+    }
+
+    readBytes(stream, length) {
+        return super.readBytes(stream, length).trim();
     }
 }
 
