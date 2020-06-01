@@ -24,7 +24,12 @@ function getMeasurementGroup(toolType, toolData, ReferencedSOPSequence) {
     const toolTypeData = toolData[toolType];
     const toolClass =
         MeasurementReport.CORNERSTONE_TOOL_CLASSES_BY_TOOL_TYPE[toolType];
-    if (!toolTypeData || !toolTypeData.data || !toolTypeData.data.length) {
+    if (
+        !toolTypeData ||
+        !toolTypeData.data ||
+        !toolTypeData.data.length ||
+        !toolClass
+    ) {
         return;
     }
 
@@ -108,7 +113,7 @@ export default class MeasurementReport {
         });
 
         const MeasurementReport = new TID1500MeasurementReport(
-            allMeasurementGroups,
+            { TID1501MeasurementGroups: allMeasurementGroups },
             options
         );
 

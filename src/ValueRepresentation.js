@@ -351,35 +351,23 @@ class BinaryRepresentation extends ValueRepresentation {
                 } else {
                     offsets = [0];
                 }
-                var nextTag = Tag.readTag(stream),
-                    fragmentStream = null,
-                    start = 4,
-                    frameOffset = offsets.shift();
 
-                while (nextTag.is(0xfffee000)) {
-                    if (frameOffset === start) {
-                        frameOffset = offsets.shift();
-                        if (fragmentStream !== null) {
-                            frames.push(fragmentStream.buffer);
-                            fragmentStream = null;
-                        }
-                    }
-                    var frameItemLength = stream.readUint32(),
-                        thisStream = stream.more(frameItemLength);
+                for (let i = 0; i < offsets.length; i++) {
+                    const nextTag = Tag.readTag(stream);
 
-                    if (fragmentStream === null) {
-                        fragmentStream = thisStream;
-                    } else {
-                        fragmentStream.concat(thisStream);
+                    if (!nextTag.is(0xfffee000)) {
+                        break;
                     }
 
-                    nextTag = Tag.readTag(stream);
-                    start += 4 + frameItemLength;
-                }
-                if (fragmentStream !== null) {
+                    const frameItemLength = stream.readUint32();
+                    const fragmentStream = stream.more(frameItemLength);
+
                     frames.push(fragmentStream.buffer);
                 }
 
+                // Read SequenceDelimitationItem Tag
+                stream.readUint32();
+                // Read SequenceDelimitationItem value.
                 stream.readUint32();
             } else {
                 throw new Error(
@@ -477,9 +465,18 @@ class DecimalString extends StringRepresentation {
     }
 
     readBytes(stream, length) {
+        const BACKSLASH = String.fromCharCode(0x5c);
         //return this.readNullPaddedString(stream, length).trim();
         let ds = stream.readString(length);
         ds = ds.replace(/[^0-9.\\\-+e]/gi, "");
+        if (ds.indexOf(BACKSLASH) !== -1) {
+            // handle decimal string with multiplicity
+            const dsArray = ds.split(BACKSLASH);
+            ds = dsArray.map(ds => Number(ds));
+        } else {
+            ds = [Number(ds)];
+        }
+
         return ds;
     }
 }
@@ -501,7 +498,7 @@ class FloatingPointSingle extends ValueRepresentation {
     }
 
     readBytes(stream) {
-        return stream.readFloat();
+        return Number(stream.readFloat());
     }
 
     writeBytes(stream, value) {
@@ -522,7 +519,7 @@ class FloatingPointDouble extends ValueRepresentation {
     }
 
     readBytes(stream) {
-        return stream.readDouble();
+        return Number(stream.readDouble());
     }
 
     writeBytes(stream, value) {
@@ -541,8 +538,20 @@ class IntegerString extends StringRepresentation {
     }
 
     readBytes(stream, length) {
-        //return this.readNullPaddedString(stream, length);
-        return stream.readString(length).trim();
+        const BACKSLASH = String.fromCharCode(0x5c);
+        let is = stream.readString(length).trim();
+
+        is = is.replace(/[^0-9.\\\-+e]/gi, "");
+
+        if (is.indexOf(BACKSLASH) !== -1) {
+            // handle integer string with multiplicity
+            const integerStringArray = is.split(BACKSLASH);
+            is = integerStringArray.map(is => Number(is));
+        } else {
+            is = [Number(is)];
+        }
+
+        return is;
     }
 }
 
@@ -577,10 +586,23 @@ class PersonName extends StringRepresentation {
     }
 
     checkLength(value) {
-        var cmps = value.split(/\^/);
-        for (var i in cmps) {
+        var components = [];
+        if (typeof value === "object" && value !== null) {
+            // In DICOM JSON, components are encoded as a mapping (object),
+            // where the keys are one or more of the following: "Alphabetic",
+            // "Ideographic", "Phonetic".
+            // http://dicom.nema.org/medical/dicom/current/output/chtml/part18/sect_F.2.2.html
+            components = Object.keys(value).forEach(key => value[key]);
+        } else if (typeof value === "string" || value instanceof String) {
+            // In DICOM Part10, components are encoded as a string,
+            // where components ("Alphabetic", "Ideographic", "Phonetic")
+            // are separated by the "=" delimeter.
+            // http://dicom.nema.org/medical/dicom/current/output/chtml/part05/sect_6.2.html
+            components = value.split(/\=/);
+        }
+        for (var i in components) {
             if (cmps.hasOwnProperty(i)) {
-                var cmp = cmps[i];
+                var cmp = components[i];
                 if (cmp.length > 64) return false;
             }
         }

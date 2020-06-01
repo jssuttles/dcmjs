@@ -82,8 +82,15 @@ export default class Segmentation extends DerivedPixels {
                 .PixelMeasuresSequence.SpacingBetweenSlices;
         }
 
-        // make an array of zeros for the pixels assuming bit packing (one bit per short)
-        // TODO: handle different packing and non-multiple of 8/16 rows and columns
+        if (
+            this.dataset.SharedFunctionalGroupsSequence
+                .PixelValueTransformationSequence
+        ) {
+            // If derived from a CT, this shouldn't be left in the SEG.
+            delete this.dataset.SharedFunctionalGroupsSequence
+                .PixelValueTransformationSequence;
+        }
+
         // The pixelData array needs to be defined once you know how many frames you'll have.
         this.dataset.PixelData = undefined;
         this.dataset.NumberOfFrames = 0;
@@ -93,35 +100,59 @@ export default class Segmentation extends DerivedPixels {
 
     /**
      * setNumberOfFrames - Sets the number of frames of the segmentation object
-     * and allocates memory for the PixelData.
+     * and allocates (non-bitpacked) memory for the PixelData for constuction.
      *
      * @param  {type} NumberOfFrames The number of segmentation frames.
      */
     setNumberOfFrames(NumberOfFrames) {
         const dataset = this.dataset;
         dataset.NumberOfFrames = NumberOfFrames;
+
         dataset.PixelData = new ArrayBuffer(
-            (dataset.Rows * dataset.Columns * NumberOfFrames) / 8
+            dataset.Rows * dataset.Columns * NumberOfFrames
         );
     }
 
     /**
-     * addSegment - Adds a segment to the dataset.
+     * bitPackPixelData - Bitpacks the pixeldata, should be called after all
+     * segments are addded.
+     *
+     * @returns {type}  description
+     */
+    bitPackPixelData() {
+        if (this.isBitpacked) {
+            console.warn(
+                `This.bitPackPixelData has already been called, it should only be called once, when all frames have been added. Exiting.`
+            );
+        }
+
+        const dataset = this.dataset;
+        const unpackedPixelData = dataset.PixelData;
+        const uInt8ViewUnpackedPixelData = new Uint8Array(unpackedPixelData);
+        const bitPackedPixelData = BitArray.pack(uInt8ViewUnpackedPixelData);
+
+        dataset.PixelData = bitPackedPixelData.buffer;
+
+        this.isBitpacked = true;
+    }
+
+    /**
+     * addSegmentFromLabelmap - Adds a segment to the dataset,
+     * where the labelmaps are a set of 2D labelmaps, from which to extract the binary maps.
      *
      * @param  {type} Segment   The segment metadata.
-     * @param  {Uint8Array} pixelData The pixelData array containing all
-     *                          frames of segmentation.
-     * @param  {Number[]} InStackPositionNumbers  The frames that the
+     * @param  {Uint8Array[]} labelmaps labelmap arrays for each index of referencedFrameNumbers.
+     * @param  {number}  segmentIndexInLabelmap The segment index to extract from the labelmap
+     *    (might be different to the segment metadata depending on implementation).
+     * @param  {number[]} referencedFrameNumbers  The frames that the
      *                                            segmentation references.
-     * @param  {Boolean} [isBitPacked = false]    Whether the suplied pixelData
-     *                                            is already bitPacked.
      *
      */
-    addSegment(
+    addSegmentFromLabelmap(
         Segment,
-        pixelData,
-        InStackPositionNumbers,
-        isBitPacked = false
+        labelmaps,
+        segmentIndexInLabelmap,
+        referencedFrameNumbers
     ) {
         if (this.dataset.NumberOfFrames === 0) {
             throw new Error(
@@ -129,37 +160,96 @@ export default class Segmentation extends DerivedPixels {
             );
         }
 
-        let bitPackedPixelData;
-
-        if (isBitPacked) {
-            bitPackedPixelData = pixelData;
-        } else {
-            bitPackedPixelData = BitArray.pack(pixelData);
-        }
-
-        this._addSegmentPixelData(bitPackedPixelData, isBitPacked);
+        this._addSegmentPixelDataFromLabelmaps(
+            labelmaps,
+            segmentIndexInLabelmap
+        );
         const ReferencedSegmentNumber = this._addSegmentMetadata(Segment);
         this._addPerFrameFunctionalGroups(
             ReferencedSegmentNumber,
-            InStackPositionNumbers
+            referencedFrameNumbers
         );
     }
 
-    _addSegmentPixelData(bitPackedPixelData) {
+    _addSegmentPixelDataFromLabelmaps(labelmaps, segmentIndex) {
+        const dataset = this.dataset;
+        const existingFrames = dataset.PerFrameFunctionalGroupsSequence.length;
+        const sliceLength = dataset.Rows * dataset.Columns;
+        const byteOffset = existingFrames * sliceLength;
+
+        const pixelDataUInt8View = new Uint8Array(
+            dataset.PixelData,
+            byteOffset,
+            labelmaps.length * sliceLength
+        );
+
+        const occupiedValue = this._getOccupiedValue();
+
+        for (let l = 0; l < labelmaps.length; l++) {
+            const labelmap = labelmaps[l];
+
+            for (let i = 0; i < labelmap.length; i++) {
+                if (labelmap[i] === segmentIndex) {
+                    pixelDataUInt8View[l * sliceLength + i] = occupiedValue;
+                }
+            }
+        }
+    }
+
+    _getOccupiedValue() {
+        if (this.dataset.SegmentationType === "FRACTIONAL") {
+            return 255;
+        }
+
+        return 1;
+    }
+
+    /**
+     * addSegment - Adds a segment to the dataset.
+     *
+     * @param  {type} Segment   The segment metadata.
+     * @param  {Uint8Array} pixelData The pixelData array containing all frames
+     *                                of the segmentation.
+     * @param  {Number[]} referencedFrameNumbers  The frames that the
+     *                                            segmentation references.
+     *
+     */
+    addSegment(Segment, pixelData, referencedFrameNumbers) {
+        if (this.dataset.NumberOfFrames === 0) {
+            throw new Error(
+                "Must set the total number of frames via setNumberOfFrames() before adding segments to the segmentation."
+            );
+        }
+
+        this._addSegmentPixelData(pixelData);
+        const ReferencedSegmentNumber = this._addSegmentMetadata(Segment);
+        this._addPerFrameFunctionalGroups(
+            ReferencedSegmentNumber,
+            referencedFrameNumbers
+        );
+    }
+
+    _addSegmentPixelData(pixelData) {
         const dataset = this.dataset;
 
-        const pixelDataUint8View = new Uint8Array(dataset.PixelData);
         const existingFrames = dataset.PerFrameFunctionalGroupsSequence.length;
-        const offset = (existingFrames * dataset.Rows * dataset.Columns) / 8;
+        const sliceLength = dataset.Rows * dataset.Columns;
+        const byteOffset = existingFrames * sliceLength;
 
-        for (let i = 0; i < bitPackedPixelData.length; i++) {
-            pixelDataUint8View[offset + i] = bitPackedPixelData[i];
+        const pixelDataUInt8View = new Uint8Array(
+            dataset.PixelData,
+            byteOffset,
+            pixelData.length
+        );
+
+        for (let i = 0; i < pixelData.length; i++) {
+            pixelDataUInt8View[i] = pixelData[i];
         }
     }
 
     _addPerFrameFunctionalGroups(
         ReferencedSegmentNumber,
-        InStackPositionNumbers
+        referencedFrameNumbers
     ) {
         const PerFrameFunctionalGroupsSequence = this.dataset
             .PerFrameFunctionalGroupsSequence;
@@ -167,8 +257,8 @@ export default class Segmentation extends DerivedPixels {
         const ReferencedSeriesSequence = this.referencedDataset
             .ReferencedSeriesSequence;
 
-        for (let i = 0; i < InStackPositionNumbers.length; i++) {
-            const frameNumber = InStackPositionNumbers[i];
+        for (let i = 0; i < referencedFrameNumbers.length; i++) {
+            const frameNumber = referencedFrameNumbers[i];
 
             const perFrameFunctionalGroups = {};
 
@@ -299,17 +389,38 @@ export default class Segmentation extends DerivedPixels {
                 break;
             default:
                 throw new Error(
-                    `SegmentAlgorithmType ${
-                        Segment.SegmentAlgorithmType
-                    } invalid.`
+                    `SegmentAlgorithmType ${Segment.SegmentAlgorithmType} invalid.`
                 );
         }
 
+        // Deep copy, so we don't change the segment index stored in cornerstoneTools.
+
         const SegmentSequence = this.dataset.SegmentSequence;
-        Segment.SegmentNumber = SegmentSequence.length + 1;
 
-        SegmentSequence.push(Segment);
+        const SegmentAlgorithmType = Segment.SegmentAlgorithmType;
 
-        return Segment.SegmentNumber;
+        const reNumberedSegmentCopy = {
+            SegmentedPropertyCategoryCodeSequence:
+                Segment.SegmentedPropertyCategoryCodeSequence,
+            SegmentNumber: (SegmentSequence.length + 1).toString(),
+            SegmentLabel: Segment.SegmentLabel,
+            SegmentAlgorithmType,
+            RecommendedDisplayCIELabValue:
+                Segment.RecommendedDisplayCIELabValue,
+            SegmentedPropertyTypeCodeSequence:
+                Segment.SegmentedPropertyTypeCodeSequence
+        };
+
+        if (
+            SegmentAlgorithmType === "AUTOMATIC" ||
+            SegmentAlgorithmType === "SEMIAUTOMATIC"
+        ) {
+            reNumberedSegmentCopy.SegmentAlgorithmName =
+                Segment.SegmentAlgorithmName;
+        }
+
+        SegmentSequence.push(reNumberedSegmentCopy);
+
+        return reNumberedSegmentCopy.SegmentNumber;
     }
 }

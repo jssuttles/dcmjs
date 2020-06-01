@@ -144,7 +144,7 @@ class DicomMetaDictionary {
             var entry = DicomMetaDictionary.nameMap[name];
             if (entry) {
                 let dataValue = dataset[naturalName];
-                if (dataValue === undefined || dataValue === null) {
+                if (dataValue === undefined) {
                     // handle the case where it was deleted from the object but is in keys
                     return;
                 }
@@ -189,9 +189,7 @@ class DicomMetaDictionary {
                     dataItem.Value = dataItem.Value.map(value => {
                         if (value.length > vr.maxLength) {
                             log.warn(
-                                `Truncating value ${value} of ${naturalName} because it is longer than ${
-                                    vr.maxLength
-                                }`
+                                `Truncating value ${value} of ${naturalName} because it is longer than ${vr.maxLength}`
                             );
                             return value.slice(0, vr.maxLength);
                         } else {

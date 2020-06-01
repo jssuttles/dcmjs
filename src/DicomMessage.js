@@ -170,12 +170,15 @@ class DicomMessage {
             }
         } else {
             var val = vr.read(stream, length, syntax);
-            if (!vr.isBinary() && singleVRs.indexOf(vr.type) === -1) {
-                values = val.split(String.fromCharCode(0x5c)); // split on backslash
-            } else if (["SQ", "OW", "OB", "UN"].includes(vr.type)) {
+            if (!vr.isBinary() && singleVRs.indexOf(vr.type) == -1) {
+                values = val;
+                if (typeof val === "string") {
+                    values = val.split(String.fromCharCode(0x5c));
+                }
+            } else if (["SQ", "OW", "OB"].indexOf(vr.type) > -1) {
                 values = val;
             } else {
-                values.push(val);
+                Array.isArray(val) ? (values = val) : values.push(val);
             }
         }
         stream.setEndian(oldEndian);
