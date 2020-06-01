@@ -2,7 +2,7 @@
 	typeof exports === 'object' && typeof module !== 'undefined' ? factory(exports) :
 	typeof define === 'function' && define.amd ? define(['exports'], factory) :
 	(global = global || self, factory(global.dcmjs = {}));
-}(this, function (exports) { 'use strict';
+}(this, (function (exports) { 'use strict';
 
 	function createCommonjsModule(fn, module) {
 		return module = { exports: {} }, fn(module, module.exports), module.exports;
@@ -419,6 +419,22 @@
 	  return byteArray;
 	}
 
+	function _typeof(obj) {
+	  "@babel/helpers - typeof";
+
+	  if (typeof Symbol === "function" && typeof Symbol.iterator === "symbol") {
+	    _typeof = function (obj) {
+	      return typeof obj;
+	    };
+	  } else {
+	    _typeof = function (obj) {
+	      return obj && typeof Symbol === "function" && obj.constructor === Symbol && obj !== Symbol.prototype ? "symbol" : typeof obj;
+	    };
+	  }
+
+	  return _typeof(obj);
+	}
+
 	function _classCallCheck(instance, Constructor) {
 	  if (!(instance instanceof Constructor)) {
 	    throw new TypeError("Cannot call a class as a function");
@@ -470,6 +486,74 @@
 	  };
 
 	  return _setPrototypeOf(o, p);
+	}
+
+	function isNativeReflectConstruct() {
+	  if (typeof Reflect === "undefined" || !Reflect.construct) return false;
+	  if (Reflect.construct.sham) return false;
+	  if (typeof Proxy === "function") return true;
+
+	  try {
+	    Date.prototype.toString.call(Reflect.construct(Date, [], function () {}));
+	    return true;
+	  } catch (e) {
+	    return false;
+	  }
+	}
+
+	function _construct(Parent, args, Class) {
+	  if (isNativeReflectConstruct()) {
+	    _construct = Reflect.construct;
+	  } else {
+	    _construct = function _construct(Parent, args, Class) {
+	      var a = [null];
+	      a.push.apply(a, args);
+	      var Constructor = Function.bind.apply(Parent, a);
+	      var instance = new Constructor();
+	      if (Class) _setPrototypeOf(instance, Class.prototype);
+	      return instance;
+	    };
+	  }
+
+	  return _construct.apply(null, arguments);
+	}
+
+	function _isNativeFunction(fn) {
+	  return Function.toString.call(fn).indexOf("[native code]") !== -1;
+	}
+
+	function _wrapNativeSuper(Class) {
+	  var _cache = typeof Map === "function" ? new Map() : undefined;
+
+	  _wrapNativeSuper = function _wrapNativeSuper(Class) {
+	    if (Class === null || !_isNativeFunction(Class)) return Class;
+
+	    if (typeof Class !== "function") {
+	      throw new TypeError("Super expression must either be null or a function");
+	    }
+
+	    if (typeof _cache !== "undefined") {
+	      if (_cache.has(Class)) return _cache.get(Class);
+
+	      _cache.set(Class, Wrapper);
+	    }
+
+	    function Wrapper() {
+	      return _construct(Class, arguments, _getPrototypeOf(this).constructor);
+	    }
+
+	    Wrapper.prototype = Object.create(Class.prototype, {
+	      constructor: {
+	        value: Wrapper,
+	        enumerable: false,
+	        writable: true,
+	        configurable: true
+	      }
+	    });
+	    return _setPrototypeOf(Wrapper, Class);
+	  };
+
+	  return _wrapNativeSuper(Class);
 	}
 
 	function _assertThisInitialized(self) {
@@ -543,6 +627,10 @@
 	}
 
 	function _iterableToArrayLimit(arr, i) {
+	  if (!(Symbol.iterator in Object(arr) || Object.prototype.toString.call(arr) === "[object Arguments]")) {
+	    return;
+	  }
+
 	  var _arr = [];
 	  var _n = true;
 	  var _d = false;
@@ -576,28 +664,25 @@
 	  throw new TypeError("Invalid attempt to destructure non-iterable instance");
 	}
 
-	//http://jonisalonen.com/2012/from-utf-16-to-utf-8-in-javascript/
-	function toUTF8Array(str) {
-	  var utf8 = [];
-
-	  for (var i = 0; i < str.length; i++) {
-	    var charcode = str.charCodeAt(i);
-	    if (charcode < 0x80) utf8.push(charcode);else if (charcode < 0x800) {
-	      utf8.push(0xc0 | charcode >> 6, 0x80 | charcode & 0x3f);
-	    } else if (charcode < 0xd800 || charcode >= 0xe000) {
-	      utf8.push(0xe0 | charcode >> 12, 0x80 | charcode >> 6 & 0x3f, 0x80 | charcode & 0x3f);
-	    } // surrogate pair
-	    else {
-	        i++; // UTF-16 encodes 0x10000-0x10FFFF by
-	        // subtracting 0x10000 and splitting the
-	        // 20 bits of 0x0-0xFFFFF into two halves
-
-	        charcode = 0x10000 + ((charcode & 0x3ff) << 10 | str.charCodeAt(i) & 0x3ff);
-	        utf8.push(0xf0 | charcode >> 18, 0x80 | charcode >> 12 & 0x3f, 0x80 | charcode >> 6 & 0x3f, 0x80 | charcode & 0x3f);
-	      }
+	/**
+	 * Converts input into a binary/latin1-encoded array
+	 * @param {*} str
+	 * @return {Number[]}
+	 */
+	function toBinaryArray(str) {
+	  if (typeof str === "number") {
+	    // somehow numbers are passed into here from the reader
+	    str = str.toString();
 	  }
 
-	  return utf8;
+	  if (typeof str !== "string") {
+	    // just in case there are other non-strings passed in
+	    return [];
+	  }
+
+	  return str.split("").map(function (char) {
+	    return char.charCodeAt(0);
+	  }); // split and map to char code
 	}
 
 	function toInt(val) {
@@ -699,13 +784,13 @@
 	    key: "writeString",
 	    value: function writeString(value) {
 	      value = value || "";
-	      var utf8 = toUTF8Array(value),
-	          bytelen = utf8.length;
+	      var bin = toBinaryArray(value),
+	          bytelen = bin.length;
 	      this.checkSize(bytelen);
 	      var startOffset = this.offset;
 
 	      for (var i = 0; i < bytelen; i++) {
-	        this.view.setUint8(startOffset, utf8[i]);
+	        this.view.setUint8(startOffset, bin[i]);
 	        startOffset++;
 	      }
 
@@ -840,7 +925,8 @@
 	      if (this.offset + step > this.buffer.byteLength) {
 	        //throw new Error("Writing exceeded the size of buffer");
 	        //resize
-	        var dst = new ArrayBuffer(this.buffer.byteLength * 2);
+	        var dstSize = this.offset + step;
+	        var dst = new ArrayBuffer(dstSize);
 	        new Uint8Array(dst).set(new Uint8Array(this.buffer));
 	        this.buffer = dst;
 	        this.view = new DataView(this.buffer);
@@ -1007,7 +1093,7 @@
 	      var val = this.readBytes(stream, length, syntax);
 
 	      if (this.fixed && this.maxLength && this.maxLength !== length) {
-	        if (!this.noMultiple && typeof val === 'string' && val.includes(String.fromCharCode(0x5c))) {
+	        if (!this.noMultiple && typeof val === "string" && val.includes(String.fromCharCode(0x5c))) {
 	          if (val.split(String.fromCharCode(0x5c)).some(function (string) {
 	            return string.length !== _this.maxLength;
 	          })) {
@@ -1100,7 +1186,9 @@
 	            isString = false,
 	            displaylen = checklen;
 
-	        if (this.checkLength) {
+	        if (checkValue === null) {
+	          valid = true;
+	        } else if (this.checkLength) {
 	          valid = this.checkLength(checkValue);
 	        } else if (this.maxCharLength) {
 	          var check = this.maxCharLength; //, checklen = checkValue.length;
@@ -1298,37 +1386,20 @@
 	            offsets = [0];
 	          }
 
-	          var nextTag = Tag.readTag(stream),
-	              fragmentStream = null,
-	              start = 4,
-	              frameOffset = offsets.shift();
+	          for (var _i = 0; _i < offsets.length; _i++) {
+	            var nextTag = Tag.readTag(stream);
 
-	          while (nextTag.is(0xfffee000)) {
-	            if (frameOffset === start) {
-	              frameOffset = offsets.shift();
-
-	              if (fragmentStream !== null) {
-	                frames.push(fragmentStream.buffer);
-	                fragmentStream = null;
-	              }
+	            if (!nextTag.is(0xfffee000)) {
+	              break;
 	            }
 
-	            var frameItemLength = stream.readUint32(),
-	                thisStream = stream.more(frameItemLength);
-
-	            if (fragmentStream === null) {
-	              fragmentStream = thisStream;
-	            } else {
-	              fragmentStream.concat(thisStream);
-	            }
-
-	            nextTag = Tag.readTag(stream);
-	            start += 4 + frameItemLength;
-	          }
-
-	          if (fragmentStream !== null) {
+	            var frameItemLength = stream.readUint32();
+	            var fragmentStream = stream.more(frameItemLength);
 	            frames.push(fragmentStream.buffer);
-	          }
+	          } // Read SequenceDelimitationItem Tag
+
+
+	          stream.readUint32(); // Read SequenceDelimitationItem value.
 
 	          stream.readUint32();
 	        } else {
@@ -1505,10 +1576,27 @@
 	  _createClass(DecimalString, [{
 	    key: "readBytes",
 	    value: function readBytes(stream, length) {
-	      //return this.readNullPaddedString(stream, length).trim();
+	      var BACKSLASH = String.fromCharCode(0x5c); //return this.readNullPaddedString(stream, length).trim();
+
 	      var ds = stream.readString(length);
 	      ds = ds.replace(/[^0-9.\\\-+e]/gi, "");
+
+	      if (ds.indexOf(BACKSLASH) !== -1) {
+	        // handle decimal string with multiplicity
+	        var dsArray = ds.split(BACKSLASH);
+	        ds = dsArray.map(function (ds) {
+	          return Number(ds);
+	        });
+	      } else {
+	        ds = [Number(ds)];
+	      }
+
 	      return ds;
+	    }
+	  }, {
+	    key: "writeBytes",
+	    value: function writeBytes(stream, value) {
+	      return _get(_getPrototypeOf(DecimalString.prototype), "writeBytes", this).call(this, stream, value.map(String));
 	    }
 	  }]);
 
@@ -1554,7 +1642,7 @@
 	  _createClass(FloatingPointSingle, [{
 	    key: "readBytes",
 	    value: function readBytes(stream) {
-	      return stream.readFloat();
+	      return Number(stream.readFloat());
 	    }
 	  }, {
 	    key: "writeBytes",
@@ -1586,7 +1674,7 @@
 	  _createClass(FloatingPointDouble, [{
 	    key: "readBytes",
 	    value: function readBytes(stream) {
-	      return stream.readDouble();
+	      return Number(stream.readDouble());
 	    }
 	  }, {
 	    key: "writeBytes",
@@ -1616,8 +1704,26 @@
 	  _createClass(IntegerString, [{
 	    key: "readBytes",
 	    value: function readBytes(stream, length) {
-	      //return this.readNullPaddedString(stream, length);
-	      return stream.readString(length).trim();
+	      var BACKSLASH = String.fromCharCode(0x5c);
+	      var is = stream.readString(length).trim();
+	      is = is.replace(/[^0-9.\\\-+e]/gi, "");
+
+	      if (is.indexOf(BACKSLASH) !== -1) {
+	        // handle integer string with multiplicity
+	        var integerStringArray = is.split(BACKSLASH);
+	        is = integerStringArray.map(function (is) {
+	          return Number(is);
+	        });
+	      } else {
+	        is = [Number(is)];
+	      }
+
+	      return is;
+	    }
+	  }, {
+	    key: "writeBytes",
+	    value: function writeBytes(stream, value) {
+	      return _get(_getPrototypeOf(IntegerString.prototype), "writeBytes", this).call(this, stream, value.map(String));
 	    }
 	  }]);
 
@@ -1694,11 +1800,27 @@
 	  _createClass(PersonName, [{
 	    key: "checkLength",
 	    value: function checkLength(value) {
-	      var cmps = value.split(/\^/);
+	      var components = [];
 
-	      for (var i in cmps) {
+	      if (_typeof(value) === "object" && value !== null) {
+	        // In DICOM JSON, components are encoded as a mapping (object),
+	        // where the keys are one or more of the following: "Alphabetic",
+	        // "Ideographic", "Phonetic".
+	        // http://dicom.nema.org/medical/dicom/current/output/chtml/part18/sect_F.2.2.html
+	        components = Object.keys(value).forEach(function (key) {
+	          return value[key];
+	        });
+	      } else if (typeof value === "string" || value instanceof String) {
+	        // In DICOM Part10, components are encoded as a string,
+	        // where components ("Alphabetic", "Ideographic", "Phonetic")
+	        // are separated by the "=" delimeter.
+	        // http://dicom.nema.org/medical/dicom/current/output/chtml/part05/sect_6.2.html
+	        components = value.split(/\=/);
+	      }
+
+	      for (var i in components) {
 	        if (cmps.hasOwnProperty(i)) {
-	          var cmp = cmps[i];
+	          var cmp = components[i];
 	          if (cmp.length > 64) return false;
 	        }
 	      }
@@ -1841,6 +1963,12 @@
 	                  } else if (ge === 0xe000) {
 	                    stack++;
 	                    toRead += 4;
+	                    var itemLength = stream.readUint32();
+	                    stream.increment(-4);
+
+	                    if (itemLength === 0) {
+	                      stack--;
+	                    }
 	                  } else {
 	                    toRead += 2;
 	                    stream.increment(-2);
@@ -2440,7 +2568,7 @@
 	    value: function cleanDataset(dataset) {
 	      var cleanedDataset = {};
 	      Object.keys(dataset).forEach(function (tag) {
-	        var data = dataset[tag];
+	        var data = Object.assign({}, dataset[tag]);
 
 	        if (data.vr === "SQ") {
 	          var cleanedValues = [];
@@ -2450,12 +2578,14 @@
 	          data.Value = cleanedValues;
 	        } else {
 	          // remove null characters from strings
-	          Object.keys(data.Value).forEach(function (index) {
-	            var dataItem = data.Value[index];
+	          data.Value = Object.keys(data.Value).map(function (index) {
+	            var item = data.Value[index];
 
-	            if (dataItem.constructor.name === "String") {
-	              data.Value[index] = dataItem.replace(/\0/, "");
+	            if (item.constructor.name === "String") {
+	              return item.replace(/\0/, "");
 	            }
+
+	            return item;
 	          });
 	        }
 
@@ -2471,7 +2601,7 @@
 	    value: function namifyDataset(dataset) {
 	      var namedDataset = {};
 	      Object.keys(dataset).forEach(function (tag) {
-	        var data = dataset[tag];
+	        var data = Object.assign({}, dataset[tag]);
 
 	        if (data.vr === "SQ") {
 	          var namedValues = [];
@@ -2506,16 +2636,6 @@
 	      };
 	      Object.keys(dataset).forEach(function (tag) {
 	        var data = dataset[tag];
-
-	        if (data.vr === "SQ") {
-	          // convert sequence to list of values
-	          var naturalValues = [];
-	          Object.keys(data.Value).forEach(function (index) {
-	            naturalValues.push(DicomMetaDictionary.naturalizeDataset(data.Value[index]));
-	          });
-	          data.Value = naturalValues;
-	        }
-
 	        var punctuatedTag = DicomMetaDictionary.punctuateTag(tag);
 	        var entry = DicomMetaDictionary.dictionary[punctuatedTag];
 	        var naturalName = tag;
@@ -2529,11 +2649,34 @@
 	          }
 	        }
 
-	        naturalDataset[naturalName] = data.Value;
+	        if (data.Value === undefined) {
+	          // In the case of type 2, add this tag but explictly set it null to indicate its empty.
+	          naturalDataset[naturalName] = null;
 
-	        if (naturalDataset[naturalName].length === 1) {
-	          // only one value is not a list
-	          naturalDataset[naturalName] = naturalDataset[naturalName][0];
+	          if (data.InlineBinary) {
+	            naturalDataset[naturalName] = {
+	              InlineBinary: data.InlineBinary
+	            };
+	          } else if (data.BulkDataURI) {
+	            naturalDataset[naturalName] = {
+	              BulkDataURI: data.BulkDataURI
+	            };
+	          }
+	        } else {
+	          if (data.vr === "SQ") {
+	            // convert sequence to list of values
+	            var naturalValues = [];
+	            Object.keys(data.Value).forEach(function (index) {
+	              naturalValues.push(DicomMetaDictionary.naturalizeDataset(data.Value[index]));
+	            });
+	            naturalDataset[naturalName] = naturalValues;
+	          } else {
+	            naturalDataset[naturalName] = data.Value;
+	          }
+
+	          if (naturalDataset[naturalName].length === 1) {
+	            naturalDataset[naturalName] = naturalDataset[naturalName][0];
+	          }
 	        }
 	      });
 	      return naturalDataset;
@@ -2572,7 +2715,7 @@
 	        if (entry) {
 	          var dataValue = dataset[naturalName];
 
-	          if (dataValue === undefined || dataValue === null) {
+	          if (dataValue === undefined) {
 	            // handle the case where it was deleted from the object but is in keys
 	            return;
 	          } // process this one entry
@@ -2583,38 +2726,40 @@
 	            Value: dataset[naturalName]
 	          };
 
-	          if (entry.vr === "ox") {
-	            if (dataset._vrMap && dataset._vrMap[naturalName]) {
-	              dataItem.vr = dataset._vrMap[naturalName];
-	            } else {
-	              lib.error("No value representation given for", naturalName);
-	            }
-	          }
-
-	          dataItem.Value = DicomMetaDictionary.denaturalizeValue(dataItem.Value);
-
-	          if (entry.vr === "SQ") {
-	            var unnaturalValues = [];
-
-	            for (var datasetIndex = 0; datasetIndex < dataItem.Value.length; datasetIndex++) {
-	              var nestedDataset = dataItem.Value[datasetIndex];
-	              unnaturalValues.push(DicomMetaDictionary.denaturalizeDataset(nestedDataset));
-	            }
-
-	            dataItem.Value = unnaturalValues;
-	          }
-
-	          var vr = ValueRepresentation.createByTypeString(dataItem.vr);
-
-	          if (!vr.isBinary() && vr.maxLength) {
-	            dataItem.Value = dataItem.Value.map(function (value) {
-	              if (value.length > vr.maxLength) {
-	                lib.warn("Truncating value ".concat(value, " of ").concat(naturalName, " because it is longer than ").concat(vr.maxLength));
-	                return value.slice(0, vr.maxLength);
+	          if (dataValue !== null) {
+	            if (entry.vr === "ox") {
+	              if (dataset._vrMap && dataset._vrMap[naturalName]) {
+	                dataItem.vr = dataset._vrMap[naturalName];
 	              } else {
-	                return value;
+	                lib.error("No value representation given for", naturalName);
 	              }
-	            });
+	            }
+
+	            dataItem.Value = DicomMetaDictionary.denaturalizeValue(dataItem.Value);
+
+	            if (entry.vr === "SQ") {
+	              var unnaturalValues = [];
+
+	              for (var datasetIndex = 0; datasetIndex < dataItem.Value.length; datasetIndex++) {
+	                var nestedDataset = dataItem.Value[datasetIndex];
+	                unnaturalValues.push(DicomMetaDictionary.denaturalizeDataset(nestedDataset));
+	              }
+
+	              dataItem.Value = unnaturalValues;
+	            }
+
+	            var vr = ValueRepresentation.createByTypeString(dataItem.vr);
+
+	            if (!vr.isBinary() && vr.maxLength) {
+	              dataItem.Value = dataItem.Value.map(function (value) {
+	                if (value.length > vr.maxLength) {
+	                  lib.warn("Truncating value ".concat(value, " of ").concat(naturalName, " because it is longer than ").concat(vr.maxLength));
+	                  return value.slice(0, vr.maxLength);
+	                } else {
+	                  return value;
+	                }
+	              });
+	            }
 	          }
 
 	          var tag = DicomMetaDictionary.unpunctuateTag(entry.tag);
@@ -2878,12 +3023,16 @@
 	      } else {
 	        var val = vr.read(stream, length, syntax);
 
-	        if (!vr.isBinary() && singleVRs$1.indexOf(vr.type) === -1) {
-	          values = val.split(String.fromCharCode(0x5c)); // split on backslash
-	        } else if (["SQ", "OW", "OB", "UN"].includes(vr.type)) {
+	        if (!vr.isBinary() && singleVRs$1.indexOf(vr.type) == -1) {
+	          values = val;
+
+	          if (typeof val === "string") {
+	            values = val.split(String.fromCharCode(0x5c));
+	          }
+	        } else if (["SQ", "OW", "OB"].indexOf(vr.type) > -1) {
 	          values = val;
 	        } else {
-	          values.push(val);
+	          Array.isArray(val) ? values = val : values.push(val);
 	        }
 	      }
 
@@ -3251,20 +3400,18 @@
 	}();
 
 	function datasetToDict(dataset) {
-	  var meta = {
-	    FileMetaInformationVersion: dataset._meta.FileMetaInformationVersion.Value,
+	  var fileMetaInformationVersionArray = new Uint8Array(2);
+	  fileMetaInformationVersionArray[1] = 1;
+	  var TransferSyntaxUID = dataset._meta.TransferSyntaxUID && dataset._meta.TransferSyntaxUID.Value && dataset._meta.TransferSyntaxUID.Value[0] ? dataset._meta.TransferSyntaxUID.Value[0] : "1.2.840.10008.1.2.1";
+	  dataset._meta = {
 	    MediaStorageSOPClassUID: dataset.SOPClassUID,
 	    MediaStorageSOPInstanceUID: dataset.SOPInstanceUID,
-	    TransferSyntaxUID: "1.2.840.10008.1.2",
-	    ImplementationClassUID: DicomMetaDictionary.uid(),
-	    ImplementationVersionName: "dcmjs-0.0"
-	  }; // TODO: Clean this up later
-
-	  if (!meta.FileMetaInformationVersion) {
-	    meta.FileMetaInformationVersion = dataset._meta.FileMetaInformationVersion.Value[0];
-	  }
-
-	  var denaturalized = DicomMetaDictionary.denaturalizeDataset(meta);
+	    ImplementationVersionName: "dcmjs-0.0",
+	    TransferSyntaxUID: TransferSyntaxUID,
+	    ImplementationClassUID: "2.25.80302813137786398554742050926734630921603366648225212145404",
+	    FileMetaInformationVersion: fileMetaInformationVersionArray.buffer
+	  };
+	  var denaturalized = DicomMetaDictionary.denaturalizeDataset(dataset._meta);
 	  var dicomDict = new DicomDict(denaturalized);
 	  dicomDict.dict = DicomMetaDictionary.denaturalizeDataset(dataset);
 	  return dicomDict;
@@ -3713,11 +3860,6 @@
 	        return;
 	      }
 
-	      if (Number(ds.NumberOfFrames) === 1) {
-	        lib.error("Single frame instance of multiframe class not supported");
-	        return;
-	      }
-
 	      if (!ds.PixelRepresentation) {
 	        // Required tag: guess signed
 	        ds.PixelRepresentation = 1;
@@ -3763,6 +3905,7 @@
 	      };
 	      var frameNumber = 1;
 	      this.datasets.forEach(function (dataset) {
+	        if (ds.NumberOfFrames === 1) ds.PerFrameFunctionalGroupsSequence = [ds.PerFrameFunctionalGroupsSequence];
 	        ds.PerFrameFunctionalGroupsSequence[frameNumber - 1].FrameContentSequence = {
 	          FrameAcquisitionDuration: 0,
 	          StackID: 1,
@@ -4184,9 +4327,12 @@
 	      if (!this.options.includeSliceSpacing) {
 	        // per dciodvfy this should not be included, but dcmqi/Slicer requires it
 	        delete this.dataset.SharedFunctionalGroupsSequence.PixelMeasuresSequence.SpacingBetweenSlices;
-	      } // make an array of zeros for the pixels assuming bit packing (one bit per short)
-	      // TODO: handle different packing and non-multiple of 8/16 rows and columns
-	      // The pixelData array needs to be defined once you know how many frames you'll have.
+	      }
+
+	      if (this.dataset.SharedFunctionalGroupsSequence.PixelValueTransformationSequence) {
+	        // If derived from a CT, this shouldn't be left in the SEG.
+	        delete this.dataset.SharedFunctionalGroupsSequence.PixelValueTransformationSequence;
+	      } // The pixelData array needs to be defined once you know how many frames you'll have.
 
 
 	      this.dataset.PixelData = undefined;
@@ -4195,7 +4341,7 @@
 	    }
 	    /**
 	     * setNumberOfFrames - Sets the number of frames of the segmentation object
-	     * and allocates memory for the PixelData.
+	     * and allocates (non-bitpacked) memory for the PixelData for constuction.
 	     *
 	     * @param  {type} NumberOfFrames The number of segmentation frames.
 	     */
@@ -4205,64 +4351,130 @@
 	    value: function setNumberOfFrames(NumberOfFrames) {
 	      var dataset = this.dataset;
 	      dataset.NumberOfFrames = NumberOfFrames;
-	      dataset.PixelData = new ArrayBuffer(dataset.Rows * dataset.Columns * NumberOfFrames / 8);
+	      dataset.PixelData = new ArrayBuffer(dataset.Rows * dataset.Columns * NumberOfFrames);
+	    }
+	    /**
+	     * bitPackPixelData - Bitpacks the pixeldata, should be called after all
+	     * segments are addded.
+	     *
+	     * @returns {type}  description
+	     */
+
+	  }, {
+	    key: "bitPackPixelData",
+	    value: function bitPackPixelData() {
+	      if (this.isBitpacked) {
+	        console.warn("This.bitPackPixelData has already been called, it should only be called once, when all frames have been added. Exiting.");
+	      }
+
+	      var dataset = this.dataset;
+	      var unpackedPixelData = dataset.PixelData;
+	      var uInt8ViewUnpackedPixelData = new Uint8Array(unpackedPixelData);
+	      var bitPackedPixelData = BitArray.pack(uInt8ViewUnpackedPixelData);
+	      dataset.PixelData = bitPackedPixelData.buffer;
+	      this.isBitpacked = true;
+	    }
+	    /**
+	     * addSegmentFromLabelmap - Adds a segment to the dataset,
+	     * where the labelmaps are a set of 2D labelmaps, from which to extract the binary maps.
+	     *
+	     * @param  {type} Segment   The segment metadata.
+	     * @param  {Uint8Array[]} labelmaps labelmap arrays for each index of referencedFrameNumbers.
+	     * @param  {number}  segmentIndexInLabelmap The segment index to extract from the labelmap
+	     *    (might be different to the segment metadata depending on implementation).
+	     * @param  {number[]} referencedFrameNumbers  The frames that the
+	     *                                            segmentation references.
+	     *
+	     */
+
+	  }, {
+	    key: "addSegmentFromLabelmap",
+	    value: function addSegmentFromLabelmap(Segment, labelmaps, segmentIndexInLabelmap, referencedFrameNumbers) {
+	      if (this.dataset.NumberOfFrames === 0) {
+	        throw new Error("Must set the total number of frames via setNumberOfFrames() before adding segments to the segmentation.");
+	      }
+
+	      this._addSegmentPixelDataFromLabelmaps(labelmaps, segmentIndexInLabelmap);
+
+	      var ReferencedSegmentNumber = this._addSegmentMetadata(Segment);
+
+	      this._addPerFrameFunctionalGroups(ReferencedSegmentNumber, referencedFrameNumbers);
+	    }
+	  }, {
+	    key: "_addSegmentPixelDataFromLabelmaps",
+	    value: function _addSegmentPixelDataFromLabelmaps(labelmaps, segmentIndex) {
+	      var dataset = this.dataset;
+	      var existingFrames = dataset.PerFrameFunctionalGroupsSequence.length;
+	      var sliceLength = dataset.Rows * dataset.Columns;
+	      var byteOffset = existingFrames * sliceLength;
+	      var pixelDataUInt8View = new Uint8Array(dataset.PixelData, byteOffset, labelmaps.length * sliceLength);
+
+	      var occupiedValue = this._getOccupiedValue();
+
+	      for (var l = 0; l < labelmaps.length; l++) {
+	        var labelmap = labelmaps[l];
+
+	        for (var i = 0; i < labelmap.length; i++) {
+	          if (labelmap[i] === segmentIndex) {
+	            pixelDataUInt8View[l * sliceLength + i] = occupiedValue;
+	          }
+	        }
+	      }
+	    }
+	  }, {
+	    key: "_getOccupiedValue",
+	    value: function _getOccupiedValue() {
+	      if (this.dataset.SegmentationType === "FRACTIONAL") {
+	        return 255;
+	      }
+
+	      return 1;
 	    }
 	    /**
 	     * addSegment - Adds a segment to the dataset.
 	     *
 	     * @param  {type} Segment   The segment metadata.
-	     * @param  {Uint8Array} pixelData The pixelData array containing all
-	     *                          frames of segmentation.
-	     * @param  {Number[]} InStackPositionNumbers  The frames that the
+	     * @param  {Uint8Array} pixelData The pixelData array containing all frames
+	     *                                of the segmentation.
+	     * @param  {Number[]} referencedFrameNumbers  The frames that the
 	     *                                            segmentation references.
-	     * @param  {Boolean} [isBitPacked = false]    Whether the suplied pixelData
-	     *                                            is already bitPacked.
 	     *
 	     */
 
 	  }, {
 	    key: "addSegment",
-	    value: function addSegment(Segment, pixelData, InStackPositionNumbers) {
-	      var isBitPacked = arguments.length > 3 && arguments[3] !== undefined ? arguments[3] : false;
-
+	    value: function addSegment(Segment, pixelData, referencedFrameNumbers) {
 	      if (this.dataset.NumberOfFrames === 0) {
 	        throw new Error("Must set the total number of frames via setNumberOfFrames() before adding segments to the segmentation.");
 	      }
 
-	      var bitPackedPixelData;
-
-	      if (isBitPacked) {
-	        bitPackedPixelData = pixelData;
-	      } else {
-	        bitPackedPixelData = BitArray.pack(pixelData);
-	      }
-
-	      this._addSegmentPixelData(bitPackedPixelData, isBitPacked);
+	      this._addSegmentPixelData(pixelData);
 
 	      var ReferencedSegmentNumber = this._addSegmentMetadata(Segment);
 
-	      this._addPerFrameFunctionalGroups(ReferencedSegmentNumber, InStackPositionNumbers);
+	      this._addPerFrameFunctionalGroups(ReferencedSegmentNumber, referencedFrameNumbers);
 	    }
 	  }, {
 	    key: "_addSegmentPixelData",
-	    value: function _addSegmentPixelData(bitPackedPixelData) {
+	    value: function _addSegmentPixelData(pixelData) {
 	      var dataset = this.dataset;
-	      var pixelDataUint8View = new Uint8Array(dataset.PixelData);
 	      var existingFrames = dataset.PerFrameFunctionalGroupsSequence.length;
-	      var offset = existingFrames * dataset.Rows * dataset.Columns / 8;
+	      var sliceLength = dataset.Rows * dataset.Columns;
+	      var byteOffset = existingFrames * sliceLength;
+	      var pixelDataUInt8View = new Uint8Array(dataset.PixelData, byteOffset, pixelData.length);
 
-	      for (var i = 0; i < bitPackedPixelData.length; i++) {
-	        pixelDataUint8View[offset + i] = bitPackedPixelData[i];
+	      for (var i = 0; i < pixelData.length; i++) {
+	        pixelDataUInt8View[i] = pixelData[i];
 	      }
 	    }
 	  }, {
 	    key: "_addPerFrameFunctionalGroups",
-	    value: function _addPerFrameFunctionalGroups(ReferencedSegmentNumber, InStackPositionNumbers) {
+	    value: function _addPerFrameFunctionalGroups(ReferencedSegmentNumber, referencedFrameNumbers) {
 	      var PerFrameFunctionalGroupsSequence = this.dataset.PerFrameFunctionalGroupsSequence;
 	      var ReferencedSeriesSequence = this.referencedDataset.ReferencedSeriesSequence;
 
-	      for (var i = 0; i < InStackPositionNumbers.length; i++) {
-	        var frameNumber = InStackPositionNumbers[i];
+	      for (var i = 0; i < referencedFrameNumbers.length; i++) {
+	        var frameNumber = referencedFrameNumbers[i];
 	        var perFrameFunctionalGroups = {};
 	        perFrameFunctionalGroups.PlanePositionSequence = DerivedDataset.copyDataset(this.referencedDataset.PerFrameFunctionalGroupsSequence[frameNumber - 1].PlanePositionSequence); // If the PlaneOrientationSequence is not in the SharedFunctionalGroupsSequence,
 	        // extract it from the PerFrameFunctionalGroupsSequence.
@@ -4360,12 +4572,26 @@
 
 	        default:
 	          throw new Error("SegmentAlgorithmType ".concat(Segment.SegmentAlgorithmType, " invalid."));
-	      }
+	      } // Deep copy, so we don't change the segment index stored in cornerstoneTools.
+
 
 	      var SegmentSequence = this.dataset.SegmentSequence;
-	      Segment.SegmentNumber = SegmentSequence.length + 1;
-	      SegmentSequence.push(Segment);
-	      return Segment.SegmentNumber;
+	      var SegmentAlgorithmType = Segment.SegmentAlgorithmType;
+	      var reNumberedSegmentCopy = {
+	        SegmentedPropertyCategoryCodeSequence: Segment.SegmentedPropertyCategoryCodeSequence,
+	        SegmentNumber: (SegmentSequence.length + 1).toString(),
+	        SegmentLabel: Segment.SegmentLabel,
+	        SegmentAlgorithmType: SegmentAlgorithmType,
+	        RecommendedDisplayCIELabValue: Segment.RecommendedDisplayCIELabValue,
+	        SegmentedPropertyTypeCodeSequence: Segment.SegmentedPropertyTypeCodeSequence
+	      };
+
+	      if (SegmentAlgorithmType === "AUTOMATIC" || SegmentAlgorithmType === "SEMIAUTOMATIC") {
+	        reNumberedSegmentCopy.SegmentAlgorithmName = Segment.SegmentAlgorithmName;
+	      }
+
+	      SegmentSequence.push(reNumberedSegmentCopy);
+	      return reNumberedSegmentCopy.SegmentNumber;
 	    }
 	  }]);
 
@@ -4436,10 +4662,109 @@
 	var TID1500MeasurementReport =
 	/*#__PURE__*/
 	function () {
-	  function TID1500MeasurementReport(TID1501MeasurementGroups) {
+	  function TID1500MeasurementReport(TIDIncludeGroups) {
 	    _classCallCheck(this, TID1500MeasurementReport);
 
-	    this.TID1501MeasurementGroups = TID1501MeasurementGroups;
+	    this.TIDIncludeGroups = TIDIncludeGroups;
+	    var ImageLibraryContentSequence = [];
+	    var CurrentRequestedProcedureEvidenceSequence = [];
+	    this.ImageLibraryContentSequence = ImageLibraryContentSequence;
+	    this.CurrentRequestedProcedureEvidenceSequence = CurrentRequestedProcedureEvidenceSequence;
+	    this.PersonObserverName = {
+	      RelationshipType: "HAS OBS CONTEXT",
+	      ValueType: "PNAME",
+	      ConceptNameCodeSequence: {
+	        CodeValue: "121008",
+	        CodingSchemeDesignator: "DCM",
+	        CodeMeaning: "Person Observer Name"
+	      },
+	      PersonName: "unknown^unknown"
+	    };
+	    this.tid1500 = {
+	      ConceptNameCodeSequence: {
+	        CodeValue: "126000",
+	        CodingSchemeDesignator: "DCM",
+	        CodeMeaning: "Imaging Measurement Report"
+	      },
+	      ContinuityOfContent: "SEPARATE",
+	      PerformedProcedureCodeSequence: [],
+	      CompletionFlag: "COMPLETE",
+	      VerificationFlag: "UNVERIFIED",
+	      ReferencedPerformedProcedureStepSequence: [],
+	      InstanceNumber: 1,
+	      CurrentRequestedProcedureEvidenceSequence: CurrentRequestedProcedureEvidenceSequence,
+	      CodingSchemeIdentificationSequence: {
+	        CodingSchemeDesignator: "99dcmjs",
+	        CodingSchemeName: "Codes used for dcmjs",
+	        CodingSchemeVersion: "0",
+	        CodingSchemeResponsibleOrganization: "https://github.com/dcmjs-org/dcmjs"
+	      },
+	      ContentTemplateSequence: {
+	        MappingResource: "DCMR",
+	        TemplateIdentifier: "1500"
+	      },
+	      ContentSequence: [{
+	        RelationshipType: "HAS CONCEPT MOD",
+	        ValueType: "CODE",
+	        ConceptNameCodeSequence: {
+	          CodeValue: "121049",
+	          CodingSchemeDesignator: "DCM",
+	          CodeMeaning: "Language of Content Item and Descendants"
+	        },
+	        ConceptCodeSequence: {
+	          CodeValue: "eng",
+	          CodingSchemeDesignator: "RFC5646",
+	          CodeMeaning: "English"
+	        },
+	        ContentSequence: {
+	          RelationshipType: "HAS CONCEPT MOD",
+	          ValueType: "CODE",
+	          ConceptNameCodeSequence: {
+	            CodeValue: "121046",
+	            CodingSchemeDesignator: "DCM",
+	            CodeMeaning: "Country of Language"
+	          },
+	          ConceptCodeSequence: {
+	            CodeValue: "US",
+	            CodingSchemeDesignator: "ISO3166_1",
+	            CodeMeaning: "United States"
+	          }
+	        }
+	      }, this.PersonObserverName, {
+	        RelationshipType: "HAS CONCEPT MOD",
+	        ValueType: "CODE",
+	        ConceptNameCodeSequence: {
+	          CodeValue: "121058",
+	          CodingSchemeDesignator: "DCM",
+	          CodeMeaning: "Procedure reported"
+	        },
+	        ConceptCodeSequence: {
+	          CodeValue: "1",
+	          CodingSchemeDesignator: "99dcmjs",
+	          CodeMeaning: "Unknown procedure"
+	        }
+	      }, {
+	        RelationshipType: "CONTAINS",
+	        ValueType: "CONTAINER",
+	        ConceptNameCodeSequence: {
+	          CodeValue: "111028",
+	          CodingSchemeDesignator: "DCM",
+	          CodeMeaning: "Image Library"
+	        },
+	        ContinuityOfContent: "SEPARATE",
+	        ContentSequence: {
+	          RelationshipType: "CONTAINS",
+	          ValueType: "CONTAINER",
+	          ConceptNameCodeSequence: {
+	            CodeValue: "126200",
+	            CodingSchemeDesignator: "DCM",
+	            CodeMeaning: "Image Library Group"
+	          },
+	          ContinuityOfContent: "SEPARATE",
+	          ContentSequence: ImageLibraryContentSequence
+	        }
+	      }]
+	    };
 	  }
 
 	  _createClass(TID1500MeasurementReport, [{
@@ -4449,17 +4774,34 @@
 	    key: "contentItem",
 	    value: function contentItem(derivationSourceDataset) {
 	      var options = arguments.length > 1 && arguments[1] !== undefined ? arguments[1] : {};
-	      // Add the Measurement Groups to the Measurement Report
+
+	      if (options.PersonName) {
+	        this.PersonObserverName.PersonName = options.PersonName;
+	      } // Add the Measurement Groups to the Measurement Report
+
+
+	      this.addTID1501MeasurementGroups(derivationSourceDataset, options);
+	      return this.tid1500;
+	    }
+	  }, {
+	    key: "addTID1501MeasurementGroups",
+	    value: function addTID1501MeasurementGroups(derivationSourceDataset, options) {
+	      var CurrentRequestedProcedureEvidenceSequence = this.CurrentRequestedProcedureEvidenceSequence,
+	          ImageLibraryContentSequence = this.ImageLibraryContentSequence;
+	      var TID1501MeasurementGroups = this.TIDIncludeGroups.TID1501MeasurementGroups;
+
+	      if (!TID1501MeasurementGroups) {
+	        return;
+	      }
+
 	      var ContentSequence = [];
-	      this.TID1501MeasurementGroups.forEach(function (child) {
+	      TID1501MeasurementGroups.forEach(function (child) {
 	        ContentSequence = ContentSequence.concat(child.contentItem());
 	      }); // For each measurement that is referenced, add a link to the
 	      // Image Library Group and the Current Requested Procedure Evidence
 	      // with the proper ReferencedSOPSequence
 
-	      var ImageLibraryContentSequence = [];
-	      var CurrentRequestedProcedureEvidenceSequence = [];
-	      this.TID1501MeasurementGroups.forEach(function (measurementGroup) {
+	      TID1501MeasurementGroups.forEach(function (measurementGroup) {
 	        measurementGroup.TID300Measurements.forEach(function (measurement) {
 	          ImageLibraryContentSequence.push({
 	            RelationshipType: "CONTAINS",
@@ -4475,121 +4817,29 @@
 	          });
 	        });
 	      });
-	      return {
+	      var ImagingMeasurments = {
+	        RelationshipType: "CONTAINS",
+	        ValueType: "CONTAINER",
 	        ConceptNameCodeSequence: {
-	          CodeValue: "126000",
+	          CodeValue: "126010",
 	          CodingSchemeDesignator: "DCM",
-	          CodeMeaning: "Imaging Measurement Report"
+	          CodeMeaning: "Imaging Measurements" // TODO: would be nice to abstract the code sequences (in a dictionary? a service?)
+
 	        },
 	        ContinuityOfContent: "SEPARATE",
-	        PerformedProcedureCodeSequence: [],
-	        CompletionFlag: "COMPLETE",
-	        VerificationFlag: "UNVERIFIED",
-	        ReferencedPerformedProcedureStepSequence: [],
-	        InstanceNumber: 1,
-	        CurrentRequestedProcedureEvidenceSequence: CurrentRequestedProcedureEvidenceSequence,
-	        CodingSchemeIdentificationSequence: {
-	          CodingSchemeDesignator: "99dcmjs",
-	          CodingSchemeName: "Codes used for dcmjs",
-	          CodingSchemeVersion: "0",
-	          CodingSchemeResponsibleOrganization: "https://github.com/dcmjs-org/dcmjs"
-	        },
-	        ContentTemplateSequence: {
-	          MappingResource: "DCMR",
-	          TemplateIdentifier: "1500"
-	        },
-	        ContentSequence: [{
-	          RelationshipType: "HAS CONCEPT MOD",
-	          ValueType: "CODE",
-	          ConceptNameCodeSequence: {
-	            CodeValue: "121049",
-	            CodingSchemeDesignator: "DCM",
-	            CodeMeaning: "Language of Content Item and Descendants"
-	          },
-	          ConceptCodeSequence: {
-	            CodeValue: "eng",
-	            CodingSchemeDesignator: "RFC5646",
-	            CodeMeaning: "English"
-	          },
-	          ContentSequence: {
-	            RelationshipType: "HAS CONCEPT MOD",
-	            ValueType: "CODE",
-	            ConceptNameCodeSequence: {
-	              CodeValue: "121046",
-	              CodingSchemeDesignator: "DCM",
-	              CodeMeaning: "Country of Language"
-	            },
-	            ConceptCodeSequence: {
-	              CodeValue: "US",
-	              CodingSchemeDesignator: "ISO3166_1",
-	              CodeMeaning: "United States"
-	            }
-	          }
-	        }, {
-	          RelationshipType: "HAS OBS CONTEXT",
-	          ValueType: "PNAME",
-	          ConceptNameCodeSequence: {
-	            CodeValue: "121008",
-	            CodingSchemeDesignator: "DCM",
-	            CodeMeaning: "Person Observer Name"
-	          },
-	          PersonName: options.PersonName || "unknown^unknown"
-	        }, {
-	          RelationshipType: "HAS CONCEPT MOD",
-	          ValueType: "CODE",
-	          ConceptNameCodeSequence: {
-	            CodeValue: "121058",
-	            CodingSchemeDesignator: "DCM",
-	            CodeMeaning: "Procedure reported"
-	          },
-	          ConceptCodeSequence: {
-	            CodeValue: "1",
-	            CodingSchemeDesignator: "99dcmjs",
-	            CodeMeaning: "Unknown procedure"
-	          }
-	        }, {
+	        ContentSequence: {
 	          RelationshipType: "CONTAINS",
 	          ValueType: "CONTAINER",
 	          ConceptNameCodeSequence: {
-	            CodeValue: "111028",
+	            CodeValue: "125007",
 	            CodingSchemeDesignator: "DCM",
-	            CodeMeaning: "Image Library"
+	            CodeMeaning: "Measurement Group"
 	          },
 	          ContinuityOfContent: "SEPARATE",
-	          ContentSequence: {
-	            RelationshipType: "CONTAINS",
-	            ValueType: "CONTAINER",
-	            ConceptNameCodeSequence: {
-	              CodeValue: "126200",
-	              CodingSchemeDesignator: "DCM",
-	              CodeMeaning: "Image Library Group"
-	            },
-	            ContinuityOfContent: "SEPARATE",
-	            ContentSequence: ImageLibraryContentSequence
-	          }
-	        }, {
-	          RelationshipType: "CONTAINS",
-	          ValueType: "CONTAINER",
-	          ConceptNameCodeSequence: {
-	            CodeValue: "126010",
-	            CodingSchemeDesignator: "DCM",
-	            CodeMeaning: "Imaging Measurements" // TODO: would be nice to abstract the code sequences (in a dictionary? a service?)
-
-	          },
-	          ContinuityOfContent: "SEPARATE",
-	          ContentSequence: {
-	            RelationshipType: "CONTAINS",
-	            ValueType: "CONTAINER",
-	            ConceptNameCodeSequence: {
-	              CodeValue: "125007",
-	              CodingSchemeDesignator: "DCM",
-	              CodeMeaning: "Measurement Group"
-	            },
-	            ContinuityOfContent: "SEPARATE",
-	            ContentSequence: ContentSequence
-	          }
-	        }]
+	          ContentSequence: ContentSequence
+	        }
 	      };
+	      this.tid1500.ContentSequence.push(ImagingMeasurments);
 	    }
 	  }]);
 
@@ -4650,7 +4900,7 @@
 	  var toolTypeData = toolData[toolType];
 	  var toolClass = MeasurementReport.CORNERSTONE_TOOL_CLASSES_BY_TOOL_TYPE[toolType];
 
-	  if (!toolTypeData || !toolTypeData.data || !toolTypeData.data.length) {
+	  if (!toolTypeData || !toolTypeData.data || !toolTypeData.data.length || !toolClass) {
 	    return;
 	  } // Loop through the array of tool instances
 	  // for this tool
@@ -4717,7 +4967,9 @@
 	        });
 	        allMeasurementGroups = allMeasurementGroups.concat(measurementGroups);
 	      });
-	      var MeasurementReport = new TID1500MeasurementReport(allMeasurementGroups, options); // TODO: what is the correct metaheader
+	      var MeasurementReport = new TID1500MeasurementReport({
+	        TID1501MeasurementGroups: allMeasurementGroups
+	      }, options); // TODO: what is the correct metaheader
 	      // http://dicom.nema.org/medical/Dicom/current/output/chtml/part10/chapter_7.html
 	      // TODO: move meta creation to happen in derivations.js
 
@@ -4920,11 +5172,11 @@
 	var Length$1 =
 	/*#__PURE__*/
 	function () {
-	  function Length$$1() {
-	    _classCallCheck(this, Length$$1);
+	  function Length() {
+	    _classCallCheck(this, Length);
 	  }
 
-	  _createClass(Length$$1, null, [{
+	  _createClass(Length, null, [{
 	    key: "measurementContentToLengthState",
 	    value: function measurementContentToLengthState(groupItemContent) {
 	      var lengthContent = groupItemContent.ContentSequence;
@@ -4935,7 +5187,7 @@
 	        sopInstanceUid: ReferencedSOPInstanceUID,
 	        frameIndex: ReferencedFrameNumber || 0,
 	        length: groupItemContent.MeasuredValueSequence.NumericValue,
-	        toolType: Length$$1.toolType
+	        toolType: Length.toolType
 	      };
 	      lengthState.handles = {
 	        start: {},
@@ -4962,7 +5214,7 @@
 	  }, {
 	    key: "getMeasurementData",
 	    value: function getMeasurementData(measurementContent) {
-	      return measurementContent.map(Length$$1.measurementContentToLengthState);
+	      return measurementContent.map(Length.measurementContentToLengthState);
 	    }
 	  }, {
 	    key: "getTID300RepresentationArguments",
@@ -4978,7 +5230,7 @@
 	    }
 	  }]);
 
-	  return Length$$1;
+	  return Length;
 	}();
 
 	Length$1.toolType = "Length";
@@ -5323,11 +5575,11 @@
 	var Bidirectional$1 =
 	/*#__PURE__*/
 	function () {
-	  function Bidirectional$$1() {
-	    _classCallCheck(this, Bidirectional$$1);
+	  function Bidirectional() {
+	    _classCallCheck(this, Bidirectional);
 	  }
 
-	  _createClass(Bidirectional$$1, null, [{
+	  _createClass(Bidirectional, null, [{
 	    key: "measurementContentToLengthState",
 	    value: function measurementContentToLengthState(groupItemContent) {
 	      var content = groupItemContent.ContentSequence;
@@ -5337,7 +5589,7 @@
 	      var state = {
 	        sopInstanceUid: ReferencedSOPInstanceUID,
 	        frameIndex: ReferencedFrameNumber || 0,
-	        toolType: Bidirectional$$1.toolType
+	        toolType: Bidirectional.toolType
 	      }; // TODO: To be implemented!
 	      // Needs to add longAxis, shortAxis, longAxisLength, shortAxisLength
 
@@ -5347,7 +5599,7 @@
 	  }, {
 	    key: "getMeasurementData",
 	    value: function getMeasurementData(measurementContent) {
-	      return measurementContent.map(Bidirectional$$1.measurementContentToLengthState);
+	      return measurementContent.map(Bidirectional.measurementContentToLengthState);
 	    }
 	  }, {
 	    key: "getTID300RepresentationArguments",
@@ -5374,7 +5626,7 @@
 	    }
 	  }]);
 
-	  return Bidirectional$$1;
+	  return Bidirectional;
 	}();
 
 	Bidirectional$1.toolType = "Bidirectional";
@@ -5689,6 +5941,10 @@ b"+i+"*=d\
 	        return "uint32"
 	      case "[object Uint8ClampedArray]":
 	        return "uint8_clamped"
+	      case "[object BigInt64Array]":
+	        return "bigint64"
+	      case "[object BigUint64Array]":
+	        return "biguint64"
 	    }
 	  }
 	  if(Array.isArray(data)) {
@@ -5708,6 +5964,8 @@ b"+i+"*=d\
 	  "uint32":[],
 	  "array":[],
 	  "uint8_clamped":[],
+	  "bigint64": [],
+	  "biguint64": [],
 	  "buffer":[],
 	  "generic":[]
 	}
@@ -5939,9 +6197,6 @@ b"+i+"*=d\
 	  var options = arguments.length > 2 && arguments[2] !== undefined ? arguments[2] : {
 	    includeSliceSpacing: true
 	  };
-	  // NOTE: Currently if a brush has been used and then erased,
-	  // This will flag up as a segmentation, even though its full of zeros.
-	  // Fixing this cleanly requires an update of cornerstoneTools. Soon (TM).
 	  var toolState = brushData.toolState,
 	      segments = brushData.segments; // Calculate the dimensions of the data cube.
 
@@ -5986,6 +6241,7 @@ b"+i+"*=d\
 	    seg.addSegment(segment, _extractCornerstoneToolsPixelData(segmentIndex, referencedFrameIndicies, toolState, images, dims), referencedFrameNumbers);
 	  }
 
+	  seg.bitPackPixelData();
 	  var segBlob = datasetToBlob(seg.dataset);
 	  return segBlob;
 	}
@@ -6386,12 +6642,853 @@ b"+i+"*=d\
 	  };
 	}
 
+	/**
+	 * Encodes a non-bitpacked frame which has one sample per pixel.
+	 *
+	 * @param {*} buffer
+	 * @param {*} numberOfFrames
+	 * @param {*} rows
+	 * @param {*} cols
+	 */
+
+	function encode(buffer, numberOfFrames, rows, cols) {
+	  var frameLength = rows * cols;
+	  var header = createHeader();
+	  var encodedFrames = [];
+
+	  for (var frame = 0; frame < numberOfFrames; frame++) {
+	    var frameOffset = frameLength * frame;
+	    encodedFrames.push(encodeFrame(buffer, frameOffset, rows, cols, header));
+	  }
+
+	  return encodedFrames;
+	}
+
+	function encodeFrame(buffer, frameOffset, rows, cols, header) {
+	  // Add header to frame:
+	  var rleArray = [];
+
+	  for (var r = 0; r < rows; r++) {
+	    var rowOffset = r * cols;
+	    var uint8Row = new Uint8Array(buffer, frameOffset + rowOffset, cols);
+	    var i = 0;
+
+	    while (i < uint8Row.length) {
+	      var literalRunLength = getLiteralRunLength(uint8Row, i);
+
+	      if (literalRunLength) {
+	        // State how many in litteral run
+	        rleArray.push(literalRunLength - 1); // Append litteral run.
+
+	        var literalRun = uint8Row.slice(i, i + literalRunLength);
+	        rleArray = [].concat(_toConsumableArray(rleArray), _toConsumableArray(literalRun));
+	        i += literalRunLength;
+	      }
+
+	      if (i >= uint8Row.length) {
+	        break;
+	      } // Next must be a replicate run.
+
+
+	      var replicateRunLength = getReplicateRunLength(uint8Row, i);
+
+	      if (replicateRunLength) {
+	        // State how many in replicate run
+	        rleArray.push(257 - replicateRunLength);
+	        rleArray.push(uint8Row[i]);
+	        i += replicateRunLength;
+	      }
+	    }
+	  }
+
+	  var headerLength = 64;
+	  var bodyLength = rleArray.length % 2 === 0 ? rleArray.length : rleArray.length + 1;
+	  var encodedFrameBuffer = new ArrayBuffer(headerLength + bodyLength); // Copy header into encodedFrameBuffer.
+
+	  var headerView = new Uint32Array(encodedFrameBuffer, 0, 16);
+
+	  for (var _i = 0; _i < headerView.length; _i++) {
+	    headerView[_i] = header[_i];
+	  }
+
+	  for (var _i2 = 0; _i2 < headerView.length; _i2++) {
+	    rleArray.push(headerView[_i2]);
+	  } // Copy rle data into encodedFrameBuffer.
+
+
+	  var bodyView = new Uint8Array(encodedFrameBuffer, 64);
+
+	  for (var _i3 = 0; _i3 < rleArray.length; _i3++) {
+	    bodyView[_i3] = rleArray[_i3];
+	  }
+
+	  return encodedFrameBuffer;
+	}
+
+	function createHeader() {
+	  var headerUint32 = new Uint32Array(16);
+	  headerUint32[0] = 1; // 1 Segment.
+
+	  headerUint32[1] = 64; // Data offset is 64 bytes.
+	  // Return byte-array version of header:
+
+	  return headerUint32;
+	}
+
+	function getLiteralRunLength(uint8Row, i) {
+	  for (var l = 0; l < uint8Row.length - i; l++) {
+	    if (uint8Row[i + l] === uint8Row[i + l + 1] && uint8Row[i + l + 1] === uint8Row[i + l + 2]) {
+	      return l;
+	    }
+
+	    if (l === 128) {
+	      return l;
+	    }
+	  }
+
+	  return uint8Row.length - i;
+	}
+
+	function getReplicateRunLength(uint8Row, i) {
+	  var first = uint8Row[i];
+
+	  for (var l = 1; l < uint8Row.length - i; l++) {
+	    if (uint8Row[i + l] !== first) {
+	      return l;
+	    }
+
+	    if (l === 128) {
+	      return l;
+	    }
+	  }
+
+	  return uint8Row.length - i;
+	}
+
+	function decode(rleEncodedFrames, rows, cols) {
+	  var pixelData = new Uint8Array(rows * cols * rleEncodedFrames.length);
+	  var buffer = pixelData.buffer;
+	  var frameLength = rows * cols;
+
+	  for (var i = 0; i < rleEncodedFrames.length; i++) {
+	    var rleEncodedFrame = rleEncodedFrames[i];
+	    var uint8FrameView = new Uint8Array(buffer, i * frameLength, frameLength);
+	    decodeFrame(rleEncodedFrame, uint8FrameView);
+	  }
+
+	  return pixelData;
+	}
+
+	function decodeFrame(rleEncodedFrame, pixelData) {
+	  // Check HEADER:
+	  var header = new Uint32Array(rleEncodedFrame, 0, 16);
+
+	  if (header[0] !== 1) {
+	    lib.error("rleSingleSamplePerPixel only supports fragments with single Byte Segments (for rle encoded segmentation data) at the current time. This rleEncodedFrame has ".concat(header[0], " Byte Segments."));
+	    return;
+	  }
+
+	  if (header[1] !== 64) {
+	    lib.error("Data offset of Byte Segment 1 should be 64 bytes, this rle fragment is encoded incorrectly.");
+	    return;
+	  }
+
+	  var uInt8Frame = new Uint8Array(rleEncodedFrame, 64);
+	  var pixelDataIndex = 0;
+	  var i = 0;
+
+	  while (pixelDataIndex < pixelData.length) {
+	    var byteValue = uInt8Frame[i];
+
+	    if (byteValue === undefined) {
+	      break;
+	    }
+
+	    if (byteValue <= 127) {
+	      // TODO -> Interpret the next N+1 bytes literally.
+	      var N = byteValue + 1;
+	      var next = i + 1; // Read the next N bytes literally.
+
+	      for (var p = next; p < next + N; p++) {
+	        pixelData[pixelDataIndex] = uInt8Frame[p];
+	        pixelDataIndex++;
+	      }
+
+	      i += N + 1;
+	    }
+
+	    if (byteValue >= 129) {
+	      var _N = 257 - byteValue;
+
+	      var _next = i + 1; // Repeat the next byte N times.
+
+
+	      for (var _p = 0; _p < _N; _p++) {
+	        pixelData[pixelDataIndex] = uInt8Frame[_next];
+	        pixelDataIndex++;
+	      }
+
+	      i += 2;
+	    }
+
+	    if (i === uInt8Frame.length) {
+	      break;
+	    }
+	  }
+	}
+
+	var Segmentation$2 = {
+	  generateSegmentation: generateSegmentation$1,
+	  generateToolState: generateToolState$1,
+	  fillSegmentation: fillSegmentation
+	};
+	/**
+	 *
+	 * @typedef {Object} BrushData
+	 * @property {Object} toolState - The cornerstoneTools global toolState.
+	 * @property {Object[]} segments - The cornerstoneTools segment metadata that corresponds to the
+	 *                                 seriesInstanceUid.
+	 */
+
+	var generateSegmentationDefaultOptions = {
+	  includeSliceSpacing: true,
+	  rleEncode: true
+	};
+	/**
+	 * generateSegmentation - Generates cornerstoneTools brush data, given a stack of
+	 * imageIds, images and the cornerstoneTools brushData.
+	 *
+	 * @param  {object[]} images An array of cornerstone images that contain the source
+	 *                           data under `image.data.byteArray.buffer`.
+	 * @param  {Object|Object[]} inputLabelmaps3D The cornerstone `Labelmap3D` object, or an array of objects.
+	 * @param  {Object} userOptions Options to pass to the segmentation derivation and `fillSegmentation`.
+	 * @returns {Blob}
+	 */
+
+	function generateSegmentation$1(images, inputLabelmaps3D) {
+	  var userOptions = arguments.length > 2 && arguments[2] !== undefined ? arguments[2] : {};
+	  var isMultiframe = images[0].imageId.includes("?frame");
+
+	  var segmentation = _createSegFromImages$1(images, isMultiframe, userOptions);
+
+	  return fillSegmentation(segmentation, inputLabelmaps3D, userOptions);
+	}
+	/**
+	 * fillSegmentation - Fills a derived segmentation dataset with cornerstoneTools `LabelMap3D` data.
+	 *
+	 * @param  {object[]} segmentation An empty segmentation derived dataset.
+	 * @param  {Object|Object[]} inputLabelmaps3D The cornerstone `Labelmap3D` object, or an array of objects.
+	 * @param  {Object} userOptions Options object to override default options.
+	 * @returns {Blob}           description
+	 */
+
+
+	function fillSegmentation(segmentation, inputLabelmaps3D) {
+	  var userOptions = arguments.length > 2 && arguments[2] !== undefined ? arguments[2] : {};
+	  var options = Object.assign({}, generateSegmentationDefaultOptions, userOptions); // Use another variable so we don't redefine labelmaps3D.
+
+	  var labelmaps3D = Array.isArray(inputLabelmaps3D) ? inputLabelmaps3D : [inputLabelmaps3D];
+	  var numberOfFrames = 0;
+	  var referencedFramesPerLabelmap = [];
+
+	  var _loop = function _loop(labelmapIndex) {
+	    var labelmap3D = labelmaps3D[labelmapIndex];
+	    var labelmaps2D = labelmap3D.labelmaps2D,
+	        metadata = labelmap3D.metadata;
+	    var referencedFramesPerSegment = [];
+
+	    for (var i = 1; i < metadata.length; i++) {
+	      if (metadata[i]) {
+	        referencedFramesPerSegment[i] = [];
+	      }
+	    }
+
+	    var _loop2 = function _loop2(_i) {
+	      var labelmap2D = labelmaps2D[_i];
+
+	      if (labelmaps2D[_i]) {
+	        var segmentsOnLabelmap = labelmap2D.segmentsOnLabelmap;
+	        segmentsOnLabelmap.forEach(function (segmentIndex) {
+	          if (segmentIndex !== 0) {
+	            referencedFramesPerSegment[segmentIndex].push(_i);
+	            numberOfFrames++;
+	          }
+	        });
+	      }
+	    };
+
+	    for (var _i = 0; _i < labelmaps2D.length; _i++) {
+	      _loop2(_i);
+	    }
+
+	    referencedFramesPerLabelmap[labelmapIndex] = referencedFramesPerSegment;
+	  };
+
+	  for (var labelmapIndex = 0; labelmapIndex < labelmaps3D.length; labelmapIndex++) {
+	    _loop(labelmapIndex);
+	  }
+
+	  segmentation.setNumberOfFrames(numberOfFrames);
+
+	  for (var _labelmapIndex = 0; _labelmapIndex < labelmaps3D.length; _labelmapIndex++) {
+	    var referencedFramesPerSegment = referencedFramesPerLabelmap[_labelmapIndex];
+	    var labelmap3D = labelmaps3D[_labelmapIndex];
+	    var metadata = labelmap3D.metadata;
+
+	    for (var segmentIndex = 1; segmentIndex < referencedFramesPerSegment.length; segmentIndex++) {
+	      var referencedFrameIndicies = referencedFramesPerSegment[segmentIndex];
+
+	      if (referencedFrameIndicies) {
+	        // Frame numbers start from 1.
+	        var referencedFrameNumbers = referencedFrameIndicies.map(function (element) {
+	          return element + 1;
+	        });
+	        var segmentMetadata = metadata[segmentIndex];
+
+	        var labelmaps = _getLabelmapsFromRefernecedFrameIndicies(labelmap3D, referencedFrameIndicies);
+
+	        segmentation.addSegmentFromLabelmap(segmentMetadata, labelmaps, segmentIndex, referencedFrameNumbers);
+	      }
+	    }
+	  }
+
+	  if (options.rleEncode) {
+	    var rleEncodedFrames = encode(segmentation.dataset.PixelData, numberOfFrames, segmentation.dataset.Rows, segmentation.dataset.Columns); // Must use fractional now to RLE encode, as the DICOM standard only allows BitStored && BitsAllocated
+	    // to be 1 for BINARY. This is not ideal and there should be a better format for compression in this manner
+	    // added to the standard.
+
+	    segmentation.assignToDataset({
+	      BitsAllocated: "8",
+	      BitsStored: "8",
+	      HighBit: "7",
+	      SegmentationType: "FRACTIONAL",
+	      SegmentationFractionalType: "PROBABILITY",
+	      MaximumFractionalValue: "255"
+	    });
+	    segmentation.dataset._meta.TransferSyntaxUID = {
+	      Value: ["1.2.840.10008.1.2.5"],
+	      vr: "UI"
+	    };
+	    segmentation.dataset._vrMap.PixelData = "OB";
+	    segmentation.dataset.PixelData = rleEncodedFrames;
+	  } else {
+	    // If no rleEncoding, at least bitpack the data.
+	    segmentation.bitPackPixelData();
+	  }
+
+	  var segBlob = datasetToBlob(segmentation.dataset);
+	  return segBlob;
+	}
+
+	function _getLabelmapsFromRefernecedFrameIndicies(labelmap3D, referencedFrameIndicies) {
+	  var labelmaps2D = labelmap3D.labelmaps2D;
+	  var labelmaps = [];
+
+	  for (var i = 0; i < referencedFrameIndicies.length; i++) {
+	    var frame = referencedFrameIndicies[i];
+	    labelmaps.push(labelmaps2D[frame].pixelData);
+	  }
+
+	  return labelmaps;
+	}
+	/**
+	 * _createSegFromImages - description
+	 *
+	 * @param  {Object[]} images    An array of the cornerstone image objects.
+	 * @param  {Boolean} isMultiframe Whether the images are multiframe.
+	 * @returns {Object}              The Seg derived dataSet.
+	 */
+
+
+	function _createSegFromImages$1(images, isMultiframe, options) {
+	  var datasets = [];
+
+	  if (isMultiframe) {
+	    var image = images[0];
+	    var arrayBuffer = image.data.byteArray.buffer;
+	    var dicomData = DicomMessage.readFile(arrayBuffer);
+	    var dataset = DicomMetaDictionary.naturalizeDataset(dicomData.dict);
+	    dataset._meta = DicomMetaDictionary.namifyDataset(dicomData.meta);
+	    datasets.push(dataset);
+	  } else {
+	    for (var i = 0; i < images.length; i++) {
+	      var _image = images[i];
+	      var _arrayBuffer = _image.data.byteArray.buffer;
+
+	      var _dicomData = DicomMessage.readFile(_arrayBuffer);
+
+	      var _dataset = DicomMetaDictionary.naturalizeDataset(_dicomData.dict);
+
+	      _dataset._meta = DicomMetaDictionary.namifyDataset(_dicomData.meta);
+	      datasets.push(_dataset);
+	    }
+	  }
+
+	  var multiframe = Normalizer.normalizeToDataset(datasets);
+	  return new Segmentation([multiframe], options);
+	}
+	/**
+	 * generateToolState - Given a set of cornrstoneTools imageIds and a Segmentation buffer,
+	 * derive cornerstoneTools toolState and brush metadata.
+	 *
+	 * @param  {string[]} imageIds    An array of the imageIds.
+	 * @param  {ArrayBuffer} arrayBuffer The SEG arrayBuffer.
+	 * @param {*} metadataProvider
+	 * @returns {Object}  The toolState and an object from which the
+	 *                    segment metadata can be derived.
+	 */
+
+
+	function generateToolState$1(imageIds, arrayBuffer, metadataProvider) {
+	  var dicomData = DicomMessage.readFile(arrayBuffer);
+	  var dataset = DicomMetaDictionary.naturalizeDataset(dicomData.dict);
+	  dataset._meta = DicomMetaDictionary.namifyDataset(dicomData.meta);
+	  var multiframe = Normalizer.normalizeToDataset([dataset]);
+	  var imagePlaneModule = metadataProvider.get("imagePlaneModule", imageIds[0]);
+	  console.warn("Note the cornerstoneTools 4.0 currently assumes the labelmaps are non-overlapping. Overlapping segments will allocate incorrectly. Feel free to submit a PR to improve this behaviour!");
+
+	  if (!imagePlaneModule) {
+	    console.warn("Insufficient metadata, imagePlaneModule missing.");
+	  }
+
+	  var ImageOrientationPatient = Array.isArray(imagePlaneModule.rowCosines) ? [].concat(_toConsumableArray(imagePlaneModule.rowCosines), _toConsumableArray(imagePlaneModule.columnCosines)) : [imagePlaneModule.rowCosines.x, imagePlaneModule.rowCosines.y, imagePlaneModule.rowCosines.z, imagePlaneModule.columnCosines.x, imagePlaneModule.columnCosines.y, imagePlaneModule.columnCosines.z]; // Get IOP from ref series, compute supported orientations:
+
+	  var validOrientations = getValidOrientations$1(ImageOrientationPatient);
+	  var sliceLength = multiframe.Columns * multiframe.Rows;
+	  var segMetadata = getSegmentMetadata$1(multiframe);
+	  var TransferSyntaxUID = multiframe._meta.TransferSyntaxUID.Value[0];
+	  var pixelData;
+
+	  if (TransferSyntaxUID === "1.2.840.10008.1.2.5") {
+	    var rleEncodedFrames = Array.isArray(multiframe.PixelData) ? multiframe.PixelData : [multiframe.PixelData];
+	    pixelData = decode(rleEncodedFrames, multiframe.Rows, multiframe.Columns);
+
+	    if (multiframe.BitsStored === 1) {
+	      console.warn("No implementation for rle + bitbacking.");
+	      return;
+	    }
+	  } else {
+	    pixelData = unpackPixelData$1(multiframe);
+
+	    if (!pixelData) {
+	      throw new Error("Fractional segmentations are not yet supported");
+	    }
+	  }
+
+	  var orientation = checkOrientation(multiframe, validOrientations, [imagePlaneModule.rows, imagePlaneModule.columns, imageIds.length]);
+	  var segmentsOnFrame = [];
+	  var insertFunction;
+
+	  switch (orientation) {
+	    case "Planar":
+	      insertFunction = insertPixelDataPlanar;
+	      break;
+
+	    case "Perpendicular":
+	      //insertFunction = insertPixelDataPerpendicular;
+	      throw new Error("Segmentations orthogonal to the acquisition plane of the source data are not yet supported.");
+
+	    case "Oblique":
+	      throw new Error("Segmentations oblique to the acquisition plane of the source data are not yet supported.");
+	  }
+
+	  var arrayBufferLength = sliceLength * imageIds.length * 2; // 2 bytes per label voxel in cst4.
+
+	  var labelmapBuffer = new ArrayBuffer(arrayBufferLength);
+	  insertFunction(segmentsOnFrame, labelmapBuffer, pixelData, multiframe, imageIds, validOrientations, metadataProvider);
+	  return {
+	    labelmapBuffer: labelmapBuffer,
+	    segMetadata: segMetadata,
+	    segmentsOnFrame: segmentsOnFrame
+	  };
+	} // TODO -> Finish soon!
+
+	function insertPixelDataPlanar(segmentsOnFrame, labelmapBuffer, pixelData, multiframe, imageIds, validOrientations, metadataProvider) {
+	  var SharedFunctionalGroupsSequence = multiframe.SharedFunctionalGroupsSequence,
+	      PerFrameFunctionalGroupsSequence = multiframe.PerFrameFunctionalGroupsSequence,
+	      Rows = multiframe.Rows,
+	      Columns = multiframe.Columns;
+	  var sharedImageOrientationPatient = SharedFunctionalGroupsSequence.PlaneOrientationSequence ? SharedFunctionalGroupsSequence.PlaneOrientationSequence.ImageOrientationPatient : undefined;
+	  var sliceLength = Columns * Rows;
+
+	  var _loop4 = function _loop4(i, groupsLen) {
+	    var PerFrameFunctionalGroups = PerFrameFunctionalGroupsSequence[i];
+	    var ImageOrientationPatientI = sharedImageOrientationPatient || PerFrameFunctionalGroups.PlaneOrientationSequence.ImageOrientationPatient;
+	    var pixelDataI2D = ndarray(new Uint8Array(pixelData.buffer, i * sliceLength, sliceLength), [Rows, Columns]);
+	    var alignedPixelDataI = alignPixelDataWithSourceData$1(pixelDataI2D, ImageOrientationPatientI, validOrientations);
+
+	    if (!alignedPixelDataI) {
+	      console.warn("Individual SEG frames are out of plane with respect to the first SEG frame, this is not yet supported, skipping this frame.");
+	      inPlane = false;
+	      return "break";
+	    }
+
+	    var segmentIndex = PerFrameFunctionalGroups.SegmentIdentificationSequence.ReferencedSegmentNumber;
+	    var SourceImageSequence = void 0;
+
+	    if (SharedFunctionalGroupsSequence.DerivationImageSequence && SharedFunctionalGroupsSequence.DerivationImageSequence.SourceImageSequence) {
+	      SourceImageSequence = SharedFunctionalGroupsSequence.DerivationImageSequence.SourceImageSequence[i];
+	    } else {
+	      SourceImageSequence = PerFrameFunctionalGroups.DerivationImageSequence.SourceImageSequence;
+	    }
+
+	    var imageId = getImageIdOfSourceImage$1(SourceImageSequence, imageIds, metadataProvider);
+
+	    if (!imageId) {
+	      // Image not present in stack, can't import this frame.
+	      return "continue";
+	    }
+
+	    var imageIdIndex = imageIds.findIndex(function (element) {
+	      return element === imageId;
+	    });
+	    var byteOffset = sliceLength * 2 * imageIdIndex; // 2 bytes/pixel
+
+	    var labelmap2DView = new Uint16Array(labelmapBuffer, byteOffset, sliceLength);
+	    var data = alignedPixelDataI.data; //
+
+	    for (var j = 0, len = alignedPixelDataI.data.length; j < len; ++j) {
+	      if (data[j]) {
+	        for (var x = j + 1; x < len; ++x) {
+	          if (data[x]) {
+	            labelmap2DView[x] = segmentIndex;
+	          }
+	        }
+
+	        if (!segmentsOnFrame[imageIdIndex]) {
+	          segmentsOnFrame[imageIdIndex] = [];
+	        }
+
+	        segmentsOnFrame[imageIdIndex].push(segmentIndex);
+	        break;
+	      }
+	    }
+	  };
+
+	  _loop3: for (var i = 0, groupsLen = PerFrameFunctionalGroupsSequence.length; i < groupsLen; ++i) {
+	    var _ret = _loop4(i);
+
+	    switch (_ret) {
+	      case "break":
+	        break _loop3;
+
+	      case "continue":
+	        continue;
+	    }
+	  }
+	}
+
+	function checkOrientation(multiframe, validOrientations, sourceDataDimensions) {
+	  var SharedFunctionalGroupsSequence = multiframe.SharedFunctionalGroupsSequence,
+	      PerFrameFunctionalGroupsSequence = multiframe.PerFrameFunctionalGroupsSequence;
+	  var sharedImageOrientationPatient = SharedFunctionalGroupsSequence.PlaneOrientationSequence ? SharedFunctionalGroupsSequence.PlaneOrientationSequence.ImageOrientationPatient : undefined; // Check if in plane.
+
+	  var PerFrameFunctionalGroups = PerFrameFunctionalGroupsSequence[0];
+	  var iop = sharedImageOrientationPatient || PerFrameFunctionalGroups.PlaneOrientationSequence.ImageOrientationPatient;
+	  var inPlane = validOrientations.some(function (operation) {
+	    return compareIOP$1(iop, operation);
+	  });
+
+	  if (inPlane) {
+	    return "Planar";
+	  }
+
+	  if (checkIfPerpendicular(iop, validOrientations[0]) && sourceDataDimensions.includes(multiframe.Rows) && sourceDataDimensions.includes(multiframe.Rows)) {
+	    // Perpendicular and fits on same grid.
+	    return "Perpendicular";
+	  }
+
+	  return "Oblique";
+	}
+	/**
+	 * compareIOP - Returns true if iop1 and iop2 are equal
+	 * within a tollerance, dx.
+	 *
+	 * @param  {Number[6]} iop1 An ImageOrientationPatient array.
+	 * @param  {Number[6]} iop2 An ImageOrientationPatient array.
+	 * @return {Boolean}      True if iop1 and iop2 are equal.
+	 */
+
+
+	function checkIfPerpendicular(iop1, iop2) {
+	  var absDotColumnCosines = Math.abs(iop1[0] * iop2[0] + iop1[1] * iop2[1] + iop1[2] * iop2[2]);
+	  var absDotRowCosines = Math.abs(iop1[3] * iop2[3] + iop1[4] * iop2[4] + iop1[5] * iop2[5]);
+	  return (absDotColumnCosines < dx$1 || Math.abs(absDotColumnCosines - 1) < dx$1) && (absDotRowCosines < dx$1 || Math.abs(absDotRowCosines - 1) < dx$1);
+	}
+	/**
+	 * unpackPixelData - Unpacks bitpacked pixelData if the Segmentation is BINARY.
+	 *
+	 * @param  {Object} multiframe The multiframe dataset.
+	 * @return {Uint8Array}      The unpacked pixelData.
+	 */
+
+
+	function unpackPixelData$1(multiframe) {
+	  var segType = multiframe.SegmentationType;
+
+	  if (segType === "BINARY") {
+	    return BitArray.unpack(multiframe.PixelData);
+	  }
+
+	  var pixelData = new Uint8Array(multiframe.PixelData);
+	  var max = multiframe.MaximumFractionalValue;
+	  var onlyMaxAndZero = pixelData.find(function (element) {
+	    return element !== 0 && element !== max;
+	  }) === undefined;
+
+	  if (!onlyMaxAndZero) {
+	    // This is a fractional segmentation, which is not currently supported.
+	    return;
+	  }
+
+	  lib.warn("This segmentation object is actually binary... processing as such.");
+	  return pixelData;
+	}
+	/**
+	 * getImageIdOfSourceImage - Returns the Cornerstone imageId of the source image.
+	 *
+	 * @param  {Object} SourceImageSequence Sequence describing the source image.
+	 * @param  {String[]} imageIds          A list of imageIds.
+	 * @param  {Object} metadataProvider    A Cornerstone metadataProvider to query
+	 *                                      metadata from imageIds.
+	 * @return {String}                     The corresponding imageId.
+	 */
+
+
+	function getImageIdOfSourceImage$1(SourceImageSequence, imageIds, metadataProvider) {
+	  var ReferencedSOPInstanceUID = SourceImageSequence.ReferencedSOPInstanceUID,
+	      ReferencedFrameNumber = SourceImageSequence.ReferencedFrameNumber;
+	  return ReferencedFrameNumber ? getImageIdOfReferencedFrame$1(ReferencedSOPInstanceUID, ReferencedFrameNumber, imageIds, metadataProvider) : getImageIdOfReferencedSingleFramedSOPInstance$1(ReferencedSOPInstanceUID, imageIds, metadataProvider);
+	}
+	/**
+	 * getImageIdOfReferencedSingleFramedSOPInstance - Returns the imageId
+	 * corresponding to the specified sopInstanceUid for single-frame images.
+	 *
+	 * @param  {String} sopInstanceUid   The sopInstanceUid of the desired image.
+	 * @param  {String[]} imageIds         The list of imageIds.
+	 * @param  {Object} metadataProvider The metadataProvider to obtain sopInstanceUids
+	 *                                 from the cornerstone imageIds.
+	 * @return {String}                  The imageId that corresponds to the sopInstanceUid.
+	 */
+
+
+	function getImageIdOfReferencedSingleFramedSOPInstance$1(sopInstanceUid, imageIds, metadataProvider) {
+	  return imageIds.find(function (imageId) {
+	    var sopCommonModule = metadataProvider.get("sopCommonModule", imageId);
+
+	    if (!sopCommonModule) {
+	      return;
+	    }
+
+	    return sopCommonModule.sopInstanceUID === sopInstanceUid;
+	  });
+	}
+	/**
+	 * getImageIdOfReferencedFrame - Returns the imageId corresponding to the
+	 * specified sopInstanceUid and frameNumber for multi-frame images.
+	 *
+	 * @param  {String} sopInstanceUid   The sopInstanceUid of the desired image.
+	 * @param  {Number} frameNumber      The frame number.
+	 * @param  {String} imageIds         The list of imageIds.
+	 * @param  {Object} metadataProvider The metadataProvider to obtain sopInstanceUids
+	 *                                   from the cornerstone imageIds.
+	 * @return {String}                  The imageId that corresponds to the sopInstanceUid.
+	 */
+
+
+	function getImageIdOfReferencedFrame$1(sopInstanceUid, frameNumber, imageIds, metadataProvider) {
+	  var imageId = imageIds.find(function (imageId) {
+	    var sopCommonModule = metadataProvider.get("sopCommonModule", imageId);
+
+	    if (!sopCommonModule) {
+	      return;
+	    }
+
+	    var imageIdFrameNumber = Number(imageId.split("frame=")[1]);
+	    return (//frameNumber is zero indexed for cornerstoneWADOImageLoader image Ids.
+	      sopCommonModule.sopInstanceUID === sopInstanceUid && imageIdFrameNumber === frameNumber - 1
+	    );
+	  });
+	  return imageId;
+	}
+	/**
+	 * getValidOrientations - returns an array of valid orientations.
+	 *
+	 * @param  {Number[6]} iop The row (0..2) an column (3..5) direction cosines.
+	 * @return {Number[8][6]} An array of valid orientations.
+	 */
+
+
+	function getValidOrientations$1(iop) {
+	  var orientations = []; // [0,  1,  2]: 0,   0hf,   0vf
+	  // [3,  4,  5]: 90,  90hf,  90vf
+	  // [6, 7]:      180, 270
+
+	  orientations[0] = iop;
+	  orientations[1] = flipImageOrientationPatient.h(iop);
+	  orientations[2] = flipImageOrientationPatient.v(iop);
+	  var iop90 = rotateDirectionCosinesInPlane(iop, Math.PI / 2);
+	  orientations[3] = iop90;
+	  orientations[4] = flipImageOrientationPatient.h(iop90);
+	  orientations[5] = flipImageOrientationPatient.v(iop90);
+	  orientations[6] = rotateDirectionCosinesInPlane(iop, Math.PI);
+	  orientations[7] = rotateDirectionCosinesInPlane(iop, 1.5 * Math.PI);
+	  return orientations;
+	}
+	/**
+	 * alignPixelDataWithSourceData -
+	 *
+	 * @param {Ndarray} pixelData2D The data to align.
+	 * @param  {Number[6]} iop The orientation of the image slice.
+	 * @param  {Number[8][6]} orientations   An array of valid imageOrientationPatient values.
+	 * @return {Ndarray}                         The aligned pixelData.
+	 */
+
+
+	function alignPixelDataWithSourceData$1(pixelData2D, iop, orientations) {
+	  if (compareIOP$1(iop, orientations[0])) {
+	    //Same orientation.
+	    return pixelData2D;
+	  } else if (compareIOP$1(iop, orientations[1])) {
+	    //Flipped vertically.
+	    return flipMatrix2D.v(pixelData2D);
+	  } else if (compareIOP$1(iop, orientations[2])) {
+	    //Flipped horizontally.
+	    return flipMatrix2D.h(pixelData2D);
+	  } else if (compareIOP$1(iop, orientations[3])) {
+	    //Rotated 90 degrees.
+	    return rotateMatrix902D(pixelData2D);
+	  } else if (compareIOP$1(iop, orientations[4])) {
+	    //Rotated 90 degrees and fliped horizontally.
+	    return flipMatrix2D.h(rotateMatrix902D(pixelData2D));
+	  } else if (compareIOP$1(iop, orientations[5])) {
+	    //Rotated 90 degrees and fliped vertically.
+	    return flipMatrix2D.v(rotateMatrix902D(pixelData2D));
+	  } else if (compareIOP$1(iop, orientations[6])) {
+	    //Rotated 180 degrees. // TODO -> Do this more effeciently, there is a 1:1 mapping like 90 degree rotation.
+	    return rotateMatrix902D(rotateMatrix902D(pixelData2D));
+	  } else if (compareIOP$1(iop, orientations[7])) {
+	    //Rotated 270 degrees.  // TODO -> Do this more effeciently, there is a 1:1 mapping like 90 degree rotation.
+	    return rotateMatrix902D(rotateMatrix902D(rotateMatrix902D(pixelData2D)));
+	  }
+	}
+
+	var dx$1 = 1e-5;
+	/**
+	 * compareIOP - Returns true if iop1 and iop2 are equal
+	 * within a tollerance, dx.
+	 *
+	 * @param  {Number[6]} iop1 An ImageOrientationPatient array.
+	 * @param  {Number[6]} iop2 An ImageOrientationPatient array.
+	 * @return {Boolean}      True if iop1 and iop2 are equal.
+	 */
+
+	function compareIOP$1(iop1, iop2) {
+	  return Math.abs(iop1[0] - iop2[0]) < dx$1 && Math.abs(iop1[1] - iop2[1]) < dx$1 && Math.abs(iop1[2] - iop2[2]) < dx$1 && Math.abs(iop1[3] - iop2[3]) < dx$1 && Math.abs(iop1[4] - iop2[4]) < dx$1 && Math.abs(iop1[5] - iop2[5]) < dx$1;
+	}
+
+	function getSegmentMetadata$1(multiframe) {
+	  var segmentSequence = multiframe.SegmentSequence;
+	  var data = [];
+
+	  if (Array.isArray(segmentSequence)) {
+	    data = [undefined].concat(_toConsumableArray(segmentSequence));
+	  } else {
+	    // Only one segment, will be stored as an object.
+	    data = [undefined, segmentSequence];
+	  }
+
+	  return {
+	    seriesInstanceUid: multiframe.ReferencedSeriesSequence.SeriesInstanceUID,
+	    data: data
+	  };
+	}
+
+	var Segmentation$3 = {
+	  generateSegmentation: generateSegmentation$2,
+	  generateToolState: generateToolState$2,
+	  fillSegmentation: fillSegmentation$1
+	};
+	/**
+	 * generateSegmentation - Generates a DICOM Segmentation object given cornerstoneTools data.
+	 *
+	 * @param  {object[]} images    An array of the cornerstone image objects.
+	 * @param  {Object|Object[]} labelmaps3DorBrushData For 4.X: The cornerstone `Labelmap3D` object, or an array of objects.
+	 *                                                  For 3.X: the BrushData.
+	 * @param  {number} cornerstoneToolsVersion The cornerstoneTools major version to map against.
+	 * @returns {Object}
+	 */
+
+	function generateSegmentation$2(images, labelmaps3DorBrushData) {
+	  var options = arguments.length > 2 && arguments[2] !== undefined ? arguments[2] : {
+	    includeSliceSpacing: true
+	  };
+	  var cornerstoneToolsVersion = arguments.length > 3 && arguments[3] !== undefined ? arguments[3] : 4;
+
+	  if (cornerstoneToolsVersion === 4) {
+	    return Segmentation$2.generateSegmentation(images, labelmaps3DorBrushData, options);
+	  }
+
+	  if (cornerstoneToolsVersion === 3) {
+	    return Segmentation$1.generateSegmentation(images, labelmaps3DorBrushData, options);
+	  }
+
+	  console.warn("No generateSegmentation adapater for cornerstone version ".concat(cornerstoneToolsVersion, ", exiting."));
+	}
+	/**
+	 * generateToolState - Given a set of cornrstoneTools imageIds and a Segmentation buffer,
+	 * derive cornerstoneTools toolState and brush metadata.
+	 *
+	 * @param  {string[]} imageIds    An array of the imageIds.
+	 * @param  {ArrayBuffer} arrayBuffer The SEG arrayBuffer.
+	 * @param {*} metadataProvider
+	 * @returns {Object}  The toolState and an object from which the
+	 *                    segment metadata can be derived.
+	 */
+
+
+	function generateToolState$2(imageIds, arrayBuffer, metadataProvider) {
+	  var cornerstoneToolsVersion = arguments.length > 3 && arguments[3] !== undefined ? arguments[3] : 4;
+
+	  if (cornerstoneToolsVersion === 4) {
+	    return Segmentation$2.generateToolState(imageIds, arrayBuffer, metadataProvider);
+	  }
+
+	  if (cornerstoneToolsVersion === 3) {
+	    return Segmentation$1.generateToolState(imageIds, arrayBuffer, metadataProvider);
+	  }
+
+	  console.warn("No generateToolState adapater for cornerstone version ".concat(cornerstoneToolsVersion, ", exiting."));
+	}
+	/**
+	 * fillSegmentation - Fills a derived segmentation dataset with cornerstoneTools `LabelMap3D` data.
+	 *
+	 * @param  {object[]} segmentation An empty segmentation derived dataset.
+	 * @param  {Object|Object[]} inputLabelmaps3D The cornerstone `Labelmap3D` object, or an array of objects.
+	 * @param  {Object} userOptions Options object to override default options.
+	 * @returns {Blob}           description
+	 */
+
+
+	function fillSegmentation$1(segmentation, inputLabelmaps3D) {
+	  var options = arguments.length > 2 && arguments[2] !== undefined ? arguments[2] : {
+	    includeSliceSpacing: true
+	  };
+	  var cornerstoneToolsVersion = arguments.length > 3 && arguments[3] !== undefined ? arguments[3] : 4;
+
+	  if (cornerstoneToolsVersion === 4) {
+	    return Segmentation$2.fillSegmentation(segmentation, inputLabelmaps3D, options);
+	  }
+
+	  console.warn("No generateSegmentation adapater for cornerstone version ".concat(cornerstoneToolsVersion, ", exiting."));
+	}
+
 	var Cornerstone = {
 	  Length: Length$1,
 	  Freehand: Freehand,
 	  Bidirectional: Bidirectional$1,
 	  MeasurementReport: MeasurementReport,
-	  Segmentation: Segmentation$1
+	  Segmentation: Segmentation$3
 	};
 
 	// Should we move it to Colors.js
@@ -6491,7 +7588,7 @@ b"+i+"*=d\
 	  return geometry;
 	}
 
-	var Segmentation$2 =
+	var Segmentation$4 =
 	/*#__PURE__*/
 	function () {
 	  function Segmentation() {
@@ -6587,7 +7684,7 @@ b"+i+"*=d\
 	}();
 
 	var VTKjs = {
-	  Segmentation: Segmentation$2
+	  Segmentation: Segmentation$4
 	};
 
 	function getTID300ContentItem$1(tool, toolClass) {
@@ -6652,7 +7749,9 @@ b"+i+"*=d\
 
 	        allMeasurementGroups = allMeasurementGroups.concat(measurementGroups);
 	      });
-	      var MeasurementReport = new TID1500MeasurementReport(allMeasurementGroups, options); // TODO: what is the correct metaheader
+	      var MeasurementReport = new TID1500MeasurementReport({
+	        TID1501MeasurementGroups: allMeasurementGroups
+	      }, options); // TODO: what is the correct metaheader
 	      // http://dicom.nema.org/medical/Dicom/current/output/chtml/part10/chapter_7.html
 	      // TODO: move meta creation to happen in derivations.js
 
@@ -6760,11 +7859,11 @@ b"+i+"*=d\
 	var Polyline$1 =
 	/*#__PURE__*/
 	function () {
-	  function Polyline$$1() {
-	    _classCallCheck(this, Polyline$$1);
+	  function Polyline() {
+	    _classCallCheck(this, Polyline);
 	  }
 
-	  _createClass(Polyline$$1, null, [{
+	  _createClass(Polyline, null, [{
 	    key: "getMeasurementData",
 	    value: function getMeasurementData(measurementContent) {
 	      // removing duplication and Getting only the graphicData information
@@ -6802,7 +7901,7 @@ b"+i+"*=d\
 	    }
 	  }]);
 
-	  return Polyline$$1;
+	  return Polyline;
 	}();
 
 	Polyline$1.graphicType = "POLYLINE";
@@ -7154,6 +8253,3346 @@ b"+i+"*=d\
 	  message: message
 	};
 
+	var Code =
+	/*#__PURE__*/
+	function () {
+	  function Code(options) {
+	    _classCallCheck(this, Code);
+
+	    this[_value] = options.value;
+	    this[_meaning] = options.meaning;
+	    this[_schemeDesignator] = options.schemeDesignator;
+	    this[_schemeVersion] = options.schemeVersion || null;
+	  }
+
+	  _createClass(Code, [{
+	    key: "value",
+	    get: function get() {
+	      return this[_value];
+	    }
+	  }, {
+	    key: "meaning",
+	    get: function get() {
+	      return this[_meaning];
+	    }
+	  }, {
+	    key: "schemeDesignator",
+	    get: function get() {
+	      return this[_schemeDesignator];
+	    }
+	  }, {
+	    key: "schemeVersion",
+	    get: function get() {
+	      return this[_schemeVersion];
+	    }
+	  }]);
+
+	  return Code;
+	}();
+
+	var CodedConcept =
+	/*#__PURE__*/
+	function () {
+	  function CodedConcept(options) {
+	    _classCallCheck(this, CodedConcept);
+
+	    if (options.value === undefined) {
+	      throw new Error("Option 'value' is required for CodedConcept.");
+	    }
+
+	    if (options.meaning === undefined) {
+	      throw new Error("Option 'meaning' is required for CodedConcept.");
+	    }
+
+	    if (options.schemeDesignator === undefined) {
+	      throw new Error("Option 'schemeDesignator' is required for CodedConcept.");
+	    }
+
+	    this.CodeValue = options.value;
+	    this.CodeMeaning = options.meaning;
+	    this.CodingSchemeDesignator = options.schemeDesignator;
+
+	    if ("schemeVersion" in options) {
+	      this.CodingSchemeVersion = options.schemeVersion;
+	    }
+	  }
+
+	  _createClass(CodedConcept, [{
+	    key: "equals",
+	    value: function equals(other) {
+	      if (other.value === this.value && other.schemeDesignator === this.schemeDesignator) {
+	        if (other.schemeVersion && this.schemeVersion) {
+	          return other.schemeVersion === this.schemeVersion;
+	        }
+
+	        return true;
+	      }
+
+	      return false;
+	    }
+	  }, {
+	    key: "value",
+	    get: function get() {
+	      return this.CodeValue;
+	    }
+	  }, {
+	    key: "meaning",
+	    get: function get() {
+	      return this.CodeMeaning;
+	    }
+	  }, {
+	    key: "schemeDesignator",
+	    get: function get() {
+	      return this.CodingSchemeDesignator;
+	    }
+	  }, {
+	    key: "schemeVersion",
+	    get: function get() {
+	      return this.CodingSchemeVersion;
+	    }
+	  }]);
+
+	  return CodedConcept;
+	}();
+
+	var coding = /*#__PURE__*/Object.freeze({
+		__proto__: null,
+		Code: Code,
+		CodedConcept: CodedConcept
+	});
+
+	var ValueTypes = {
+	  CODE: "CODE",
+	  COMPOSITE: "COMPOSITE",
+	  CONTAINER: "CONTAINER",
+	  DATE: "DATE",
+	  DATETIME: "DATETIME",
+	  IMAGE: "IMAGE",
+	  NUM: "NUM",
+	  PNAME: "PNAME",
+	  SCOORD: "SCOORD",
+	  SCOORD3D: "SCOORD3D",
+	  TCOORD: "TCOORD",
+	  TEXT: "TEXT",
+	  TIME: "TIME",
+	  UIDREF: "UIDREF",
+	  WAVEFORM: "WAVEFORM"
+	};
+	Object.freeze(ValueTypes);
+	var GraphicTypes = {
+	  CIRCLE: "CIRCLE",
+	  ELLIPSE: "ELLIPSE",
+	  ELLIPSOID: "ELLIPSOID",
+	  MULTIPOINT: "MULTIPOINT",
+	  POINT: "POINT",
+	  POLYLINE: "POLYLINE"
+	};
+	Object.freeze(GraphicTypes);
+	var GraphicTypes3D = {
+	  ELLIPSE: "ELLIPSE",
+	  ELLIPSOID: "ELLIPSOID",
+	  MULTIPOINT: "MULTIPOINT",
+	  POINT: "POINT",
+	  POLYLINE: "POLYLINE",
+	  POLYGON: "POLYGON"
+	};
+	Object.freeze(GraphicTypes3D);
+	var TemporalRangeTypes = {
+	  BEGIN: "BEGIN",
+	  END: "END",
+	  MULTIPOINT: "MULTIPOINT",
+	  MULTISEGMENT: "MULTISEGMENT",
+	  POINT: "POINT",
+	  SEGMENT: "SEGMENT"
+	};
+	Object.freeze(TemporalRangeTypes);
+	var RelationshipTypes = {
+	  CONTAINS: "CONTAINS",
+	  HAS_ACQ_CONTENT: "HAS ACQ CONTENT",
+	  HAS_CONCEPT_MOD: "HAS CONCEPT MOD",
+	  HAS_OBS_CONTEXT: "HAS OBS CONTEXT",
+	  HAS_PROPERTIES: "HAS PROPERTIES",
+	  INFERRED_FROM: "INFERRED FROM",
+	  SELECTED_FROM: "SELECTED FROM"
+	};
+	Object.freeze(RelationshipTypes);
+	var PixelOriginInterpretations = {
+	  FRAME: "FRAME",
+	  VOLUME: "VOLUME"
+	};
+	Object.freeze(RelationshipTypes);
+
+	function isFloat(n) {
+	  return n === +n && n !== (n | 0);
+	}
+
+	function zeroPad(value) {
+	  return (value > 9 ? "" : "0") + value;
+	}
+
+	function TM(date) {
+	  // %H%M%S.%f
+	  var hours = date.getHours();
+	  var minutes = date.getMinutes();
+	  var seconds = date.getSeconds();
+	  var milliseconds = date.getMilliseconds();
+	  return zeroPad(hours) + zeroPad(minutes) + zeroPad(seconds) + milliseconds;
+	}
+
+	function DA(date) {
+	  var year = date.getFullYear();
+	  var month = date.getMonth() + 1;
+	  var day = date.getDate();
+	  return year + zeroPad(month) + zeroPad(day);
+	}
+
+	function DT(date) {
+	  return DA(date) + TM(date);
+	}
+
+	var ContentSequence$1 =
+	/*#__PURE__*/
+	function (_Array) {
+	  _inherits(ContentSequence, _Array);
+
+	  function ContentSequence() {
+	    var _getPrototypeOf2;
+
+	    _classCallCheck(this, ContentSequence);
+
+	    for (var _len = arguments.length, args = new Array(_len), _key = 0; _key < _len; _key++) {
+	      args[_key] = arguments[_key];
+	    }
+
+	    return _possibleConstructorReturn(this, (_getPrototypeOf2 = _getPrototypeOf(ContentSequence)).call.apply(_getPrototypeOf2, [this].concat(args)));
+	  } // filterBy(options) {
+	  // }
+
+
+	  return ContentSequence;
+	}(_wrapNativeSuper(Array));
+
+	var ContentItem = function ContentItem(options) {
+	  _classCallCheck(this, ContentItem);
+
+	  if (options.name === undefined) {
+	    throw new Error("Option 'name' is required for ContentItem.");
+	  }
+
+	  if (options.name.constructor !== CodedConcept) {
+	    throw new Error("Option 'name' must have type CodedConcept.");
+	  }
+
+	  this.ConceptNameCodeSequence = [options.name];
+
+	  if (options.valueType === undefined) {
+	    throw new Error("Option 'valueType' is required for ContentItem.");
+	  }
+
+	  if (!(Object.values(ValueTypes).indexOf(options.valueType) !== -1)) {
+	    throw new Error("Invalid value type ".concat(options.valueType));
+	  }
+
+	  this.ValueType = options.valueType;
+
+	  if (options.relationshipType !== undefined) {
+	    if (!(Object.values(RelationshipTypes).indexOf(options.relationshipType) !== -1)) {
+	      throw new Error("Invalid relationship type ".concat(options.relationshipTypes));
+	    }
+
+	    this.RelationshipType = options.relationshipType;
+	  } // TODO: relationship type is required
+
+	} // getContentItems(options) {
+	//   // TODO: filter by name, value type and relationship type
+	//   return this.ContentSequence;
+	// }
+	;
+
+	var CodeContentItem =
+	/*#__PURE__*/
+	function (_ContentItem) {
+	  _inherits(CodeContentItem, _ContentItem);
+
+	  function CodeContentItem(options) {
+	    var _this;
+
+	    _classCallCheck(this, CodeContentItem);
+
+	    _this = _possibleConstructorReturn(this, _getPrototypeOf(CodeContentItem).call(this, {
+	      name: options.name,
+	      relationshipType: options.relationshipType,
+	      valueType: ValueTypes.CODE
+	    }));
+
+	    if (options.value === undefined) {
+	      throw new Error("Option 'value' is required for CodeContentItem.");
+	    }
+
+	    if (!(options.value || options.value.constructor === CodedConcept)) {
+	      throw new Error("Option 'value' must have type CodedConcept.");
+	    }
+
+	    _this.ConceptCodeSequence = [options.value];
+	    return _this;
+	  }
+
+	  return CodeContentItem;
+	}(ContentItem);
+
+	var TextContentItem =
+	/*#__PURE__*/
+	function (_ContentItem2) {
+	  _inherits(TextContentItem, _ContentItem2);
+
+	  function TextContentItem(options) {
+	    var _this2;
+
+	    _classCallCheck(this, TextContentItem);
+
+	    _this2 = _possibleConstructorReturn(this, _getPrototypeOf(TextContentItem).call(this, {
+	      name: options.name,
+	      relationshipType: options.relationshipType,
+	      valueType: ValueTypes.TEXT
+	    }));
+
+	    if (options.value === undefined) {
+	      throw new Error("Option 'value' is required for TextContentItem.");
+	    }
+
+	    if (!(typeof options.value === "string" || options.value instanceof String)) {
+	      throw new Error("Option 'value' must have type String.");
+	    }
+
+	    _this2.TextValue = options.value;
+	    return _this2;
+	  }
+
+	  return TextContentItem;
+	}(ContentItem);
+
+	var PNameContentItem =
+	/*#__PURE__*/
+	function (_ContentItem3) {
+	  _inherits(PNameContentItem, _ContentItem3);
+
+	  function PNameContentItem(options) {
+	    var _this3;
+
+	    _classCallCheck(this, PNameContentItem);
+
+	    _this3 = _possibleConstructorReturn(this, _getPrototypeOf(PNameContentItem).call(this, {
+	      name: options.name,
+	      relationshipType: options.relationshipType,
+	      valueType: ValueTypes.PNAME
+	    }));
+
+	    if (options.value === undefined) {
+	      throw new Error("Option 'value' is required for PNameContentItem.");
+	    }
+
+	    if (!(typeof options.value === "string" || options.value instanceof String)) {
+	      throw new Error("Option 'value' must have type String.");
+	    }
+
+	    _this3.PersonName = options.value;
+	    return _this3;
+	  }
+
+	  return PNameContentItem;
+	}(ContentItem);
+
+	var TimeContentItem =
+	/*#__PURE__*/
+	function (_ContentItem4) {
+	  _inherits(TimeContentItem, _ContentItem4);
+
+	  function TimeContentItem(options) {
+	    var _this4;
+
+	    _classCallCheck(this, TimeContentItem);
+
+	    _this4 = _possibleConstructorReturn(this, _getPrototypeOf(TimeContentItem).call(this, {
+	      name: options.name,
+	      relationshipType: options.relationshipType,
+	      valueType: ValueTypes.TIME
+	    }));
+
+	    if (options.value === undefined) {
+	      throw new Error("Option 'value' is required for TimeContentItem.");
+	    }
+
+	    if (!(_typeof(options.value) === "object" || options.value instanceof Date)) {
+	      throw new Error("Option 'value' must have type Date.");
+	    }
+
+	    _this4.Time = TM(options.value);
+	    return _this4;
+	  }
+
+	  return TimeContentItem;
+	}(ContentItem);
+
+	var DateContentItem =
+	/*#__PURE__*/
+	function (_ContentItem5) {
+	  _inherits(DateContentItem, _ContentItem5);
+
+	  function DateContentItem(options) {
+	    var _this5;
+
+	    _classCallCheck(this, DateContentItem);
+
+	    _this5 = _possibleConstructorReturn(this, _getPrototypeOf(DateContentItem).call(this, {
+	      name: options.name,
+	      relationshipType: options.relationshipType,
+	      valueType: ValueTypes.DATE
+	    }));
+
+	    if (options.value === undefined) {
+	      throw new Error("Option 'value' is required for DateContentItem.");
+	    }
+
+	    if (!(_typeof(options.value) === "object" || options.value instanceof Date)) {
+	      throw new Error("Option 'value' must have type Date.");
+	    }
+
+	    _this5.Date = DA(options.value);
+	    return _this5;
+	  }
+
+	  return DateContentItem;
+	}(ContentItem);
+
+	var DateTimeContentItem =
+	/*#__PURE__*/
+	function (_ContentItem6) {
+	  _inherits(DateTimeContentItem, _ContentItem6);
+
+	  function DateTimeContentItem(options) {
+	    var _this6;
+
+	    _classCallCheck(this, DateTimeContentItem);
+
+	    _this6 = _possibleConstructorReturn(this, _getPrototypeOf(DateTimeContentItem).call(this, {
+	      name: options.name,
+	      relationshipType: options.relationshipType,
+	      valueType: ValueTypes.DATETIME
+	    }));
+
+	    if (options.value === undefined) {
+	      throw new Error("Option 'value' is required for DateTimeContentItem.");
+	    }
+
+	    if (!(_typeof(options.value) === "object" || options.value instanceof Date)) {
+	      throw new Error("Option 'value' must have type Date.");
+	    }
+
+	    _this6.DateTime = DT(otions.value);
+	    return _this6;
+	  }
+
+	  return DateTimeContentItem;
+	}(ContentItem);
+
+	var UIDRefContentItem =
+	/*#__PURE__*/
+	function (_ContentItem7) {
+	  _inherits(UIDRefContentItem, _ContentItem7);
+
+	  function UIDRefContentItem(options) {
+	    var _this7;
+
+	    _classCallCheck(this, UIDRefContentItem);
+
+	    _this7 = _possibleConstructorReturn(this, _getPrototypeOf(UIDRefContentItem).call(this, {
+	      name: options.name,
+	      relationshipType: options.relationshipType,
+	      valueType: ValueTypes.UIDREF
+	    }));
+
+	    if (options.value === undefined) {
+	      throw new Error("Option 'value' is required for UIDRefContentItem.");
+	    }
+
+	    if (!(typeof options.value === "string" || options.value instanceof String)) {
+	      throw new Error("Option 'value' must have type String.");
+	    }
+
+	    _this7.UID = options.value;
+	    return _this7;
+	  }
+
+	  return UIDRefContentItem;
+	}(ContentItem);
+
+	var NumContentItem =
+	/*#__PURE__*/
+	function (_ContentItem8) {
+	  _inherits(NumContentItem, _ContentItem8);
+
+	  function NumContentItem(options) {
+	    var _this8;
+
+	    _classCallCheck(this, NumContentItem);
+
+	    _this8 = _possibleConstructorReturn(this, _getPrototypeOf(NumContentItem).call(this, {
+	      name: options.name,
+	      relationshipType: options.relationshipType,
+	      valueType: ValueTypes.NUM
+	    }));
+
+	    if (options.value !== undefined) {
+	      if (!(typeof options.value === "number" || options.value instanceof Number)) {
+	        throw new Error("Option 'value' must have type Number.");
+	      }
+
+	      if (options.unit === undefined) {
+	        throw new Error("Option 'unit' is required for NumContentItem with 'value'.");
+	      }
+
+	      var item = {};
+	      item.NumericValue = options.value;
+
+	      if (isFloat(options.value)) {
+	        item.FloatingPointValue = options.value;
+	      }
+
+	      item.MeasurementUnitsCodeSequence = options.unit;
+	      _this8.MeasuredValueSequence = [item];
+	    } else if (options.qualifier !== undefined) {
+	      if (!(options.qualifier || options.qualifier.constructor === CodedConcept)) {
+	        throw new Error("Option 'qualifier' must have type CodedConcept.");
+	      }
+
+	      _this8.NumericValueQualifierCodeSequence = [options.qualifier];
+	    } else {
+	      throw new Error("Either option 'value' or 'qualifier' is required for NumContentItem.");
+	    }
+
+	    return _this8;
+	  }
+
+	  return NumContentItem;
+	}(ContentItem);
+
+	var ContainerContentItem =
+	/*#__PURE__*/
+	function (_ContentItem9) {
+	  _inherits(ContainerContentItem, _ContentItem9);
+
+	  function ContainerContentItem(options) {
+	    var _this9;
+
+	    _classCallCheck(this, ContainerContentItem);
+
+	    _this9 = _possibleConstructorReturn(this, _getPrototypeOf(ContainerContentItem).call(this, {
+	      name: options.name,
+	      relationshipType: options.relationshipType,
+	      valueType: ValueTypes.CONTAINER
+	    }));
+
+	    if (options.isContentContinuous !== undefined) {
+	      _this9.ContinuityOfContent = "CONTINUOUS";
+	    } else {
+	      _this9.ContinuityOfContent = "SEPARATE";
+	    }
+
+	    if (options.templateID !== undefined) {
+	      if (!(typeof options.templateID === "string" || options.templateID instanceof String)) {
+	        throw new Error("Option 'templateID' must have type String.");
+	      }
+
+	      var item = {};
+	      item.MappingResource = "DCMR";
+	      item.TemplateIdentifier = options.templateID;
+	      _this9.ContentTemplateSequence = [item];
+	    }
+
+	    return _this9;
+	  }
+
+	  return ContainerContentItem;
+	}(ContentItem);
+
+	var CompositeContentItem =
+	/*#__PURE__*/
+	function (_ContentItem10) {
+	  _inherits(CompositeContentItem, _ContentItem10);
+
+	  function CompositeContentItem(options) {
+	    var _this10;
+
+	    _classCallCheck(this, CompositeContentItem);
+
+	    _this10 = _possibleConstructorReturn(this, _getPrototypeOf(CompositeContentItem).call(this, {
+	      name: options.name,
+	      relationshipType: options.relationshipType,
+	      valueType: ValueTypes.COMPOSITE
+	    }));
+
+	    if (options.referencedSOPClassUID === undefined) {
+	      throw new Error("Option 'referencedSOPClassUID' is required for CompositeContentItem.");
+	    }
+
+	    if (options.referencedSOPInstanceUID === undefined) {
+	      throw new Error("Option 'referencedSOPInstanceUID' is required for CompositeContentItem.");
+	    }
+
+	    if (!(typeof options.referencedSOPClassUID === "string" || options.referencedSOPClassUID instanceof String)) {
+	      throw new Error("Option 'referencedSOPClassUID' must have type String.");
+	    }
+
+	    if (!(typeof options.referencedSOPInstanceUID === "string" || options.referencedSOPInstanceUID instanceof String)) {
+	      throw new Error("Option 'referencedSOPInstanceUID' must have type String.");
+	    }
+
+	    var item = {};
+	    item.ReferencedSOPClassUID = options.referencedSOPClassUID;
+	    item.ReferencedSOPInstanceUID = options.referencedSOPInstanceUID;
+	    _this10.ReferenceSOPSequence = [item];
+	    return _this10;
+	  }
+
+	  return CompositeContentItem;
+	}(ContentItem);
+
+	var ImageContentItem =
+	/*#__PURE__*/
+	function (_ContentItem11) {
+	  _inherits(ImageContentItem, _ContentItem11);
+
+	  function ImageContentItem(options) {
+	    var _this11;
+
+	    _classCallCheck(this, ImageContentItem);
+
+	    _this11 = _possibleConstructorReturn(this, _getPrototypeOf(ImageContentItem).call(this, {
+	      name: options.name,
+	      relationshipType: options.relationshipType,
+	      valueType: ValueTypes.IMAGE
+	    }));
+
+	    if (options.referencedSOPClassUID === undefined) {
+	      throw new Error("Option 'referencedSOPClassUID' is required for ImageContentItem.");
+	    }
+
+	    if (options.referencedSOPInstanceUID === undefined) {
+	      throw new Error("Option 'referencedSOPInstanceUID' is required for ImageContentItem.");
+	    }
+
+	    if (!(typeof options.referencedSOPClassUID === "string" || options.referencedSOPClassUID instanceof String)) {
+	      throw new Error("Option 'referencedSOPClassUID' must have type String.");
+	    }
+
+	    if (!(typeof options.referencedSOPInstanceUID === "string" || options.referencedSOPInstanceUID instanceof String)) {
+	      throw new Error("Option 'referencedSOPInstanceUID' must have type String.");
+	    }
+
+	    var item = {};
+	    item.ReferencedSOPClassUID = options.referencedSOPClassUID;
+	    item.ReferencedSOPInstanceUID = options.referencedSOPInstanceUID;
+
+	    if (options.referencedFrameNumbers !== undefined) {
+	      if (!(_typeof(options.referencedFrameNumbers) === "object" || options.referencedFrameNumbers instanceof Array)) {
+	        throw new Error("Option 'referencedFrameNumbers' must have type Array.");
+	      } // FIXME: value multiplicity
+
+
+	      item.ReferencedFrameNumber = options.referencedFrameNumbers;
+	    }
+
+	    if (options.referencedFrameSegmentNumber !== undefined) {
+	      if (!(_typeof(options.referencedSegmentNumbers) === "object" || options.referencedSegmentNumbers instanceof Array)) {
+	        throw new Error("Option 'referencedSegmentNumbers' must have type Array.");
+	      } // FIXME: value multiplicity
+
+
+	      item.ReferencedSegmentNumber = options.referencedSegmentNumbers;
+	    }
+
+	    _this11.ReferencedSOPSequence = [item];
+	    return _this11;
+	  }
+
+	  return ImageContentItem;
+	}(ContentItem);
+
+	var ScoordContentItem =
+	/*#__PURE__*/
+	function (_ContentItem12) {
+	  _inherits(ScoordContentItem, _ContentItem12);
+
+	  function ScoordContentItem(options) {
+	    var _this12;
+
+	    _classCallCheck(this, ScoordContentItem);
+
+	    _this12 = _possibleConstructorReturn(this, _getPrototypeOf(ScoordContentItem).call(this, {
+	      name: options.name,
+	      relationshipType: options.relationshipType,
+	      valueType: ValueTypes.SCOORD
+	    }));
+
+	    if (options.graphicType === undefined) {
+	      throw new Error("Option 'graphicType' is required for ScoordContentItem.");
+	    }
+
+	    if (!(typeof options.graphicType === "string" || options.graphicType instanceof String)) {
+	      throw new Error("Option 'graphicType' of ScoordContentItem must have type String.");
+	    }
+
+	    if (options.graphicData === undefined) {
+	      throw new Error("Option 'graphicData' is required for ScoordContentItem.");
+	    }
+
+	    if (!(_typeof(options.graphicData) === "object" || options.graphicData instanceof Array)) {
+	      throw new Error("Option 'graphicData' of ScoordContentItem must have type Array.");
+	    }
+
+	    if (Object.values(GraphicTypes).indexOf(options.graphicType) === -1) {
+	      throw new Error("Invalid graphic type '".concat(options.graphicType, "'."));
+	    }
+
+	    if (options.graphicData[0] instanceof Array) {
+	      options.graphicData = [].concat.apply([], options.graphicData);
+	    }
+
+	    _this12.GraphicData = options.graphicData;
+	    options.pixelOriginInterpretation = options.pixelOriginInterpretation || PixelOriginInterpretations.VOLUME;
+
+	    if (!(typeof options.pixelOriginInterpretation === "string" || options.pixelOriginInterpretation instanceof String)) {
+	      throw new Error("Option 'pixelOriginInterpretation' must have type String.");
+	    }
+
+	    if (Object.values(PixelOriginInterpretations).indexOf(options.pixelOriginInterpretation) === -1) {
+	      throw new Error("Invalid pixel origin interpretation '".concat(options.pixelOriginInterpretation, "'."));
+	    }
+
+	    if (options.fiducialUID !== undefined) {
+	      if (!(typeof options.fiducialUID === "string" || options.fiducialUID instanceof String)) {
+	        throw new Error("Option 'fiducialUID' must have type String.");
+	      }
+
+	      _this12.FiducialUID = options.fiducialUID;
+	    }
+
+	    return _this12;
+	  }
+
+	  return ScoordContentItem;
+	}(ContentItem);
+
+	var Scoord3DContentItem =
+	/*#__PURE__*/
+	function (_ContentItem13) {
+	  _inherits(Scoord3DContentItem, _ContentItem13);
+
+	  function Scoord3DContentItem(options) {
+	    var _this13;
+
+	    _classCallCheck(this, Scoord3DContentItem);
+
+	    _this13 = _possibleConstructorReturn(this, _getPrototypeOf(Scoord3DContentItem).call(this, {
+	      name: options.name,
+	      relationshipType: options.relationshipType,
+	      valueType: ValueTypes.SCOORD3D
+	    }));
+
+	    if (options.graphicType === undefined) {
+	      throw new Error("Option 'graphicType' is required for Scoord3DContentItem.");
+	    }
+
+	    if (!(typeof options.graphicType === "string" || options.graphicType instanceof String)) {
+	      throw new Error("Option 'graphicType' must have type String.");
+	    }
+
+	    if (options.graphicData === undefined) {
+	      throw new Error("Option 'graphicData' is required for Scoord3DContentItem.");
+	    }
+
+	    if (!(_typeof(options.graphicData) === "object" || options.graphicData instanceof Array)) {
+	      throw new Error("Option 'graphicData' must have type Array.");
+	    }
+
+	    if (Object.values(GraphicTypes3D).indexOf(options.graphicType) === -1) {
+	      throw new Error("Invalid graphic type '".concat(options.graphicType, "'."));
+	    }
+
+	    if (options.graphicData[0] instanceof Array) {
+	      options.graphicData = [].concat.apply([], options.graphicData);
+	    }
+
+	    _this13.GraphicType = options.graphicType;
+	    _this13.GraphicData = options.graphicData;
+
+	    if (options.frameOfReferenceUID === undefined) {
+	      throw new Error("Option 'frameOfReferenceUID' is required for Scoord3DContentItem.");
+	    }
+
+	    if (!(typeof options.frameOfReferenceUID === "string" || options.frameOfReferenceUID instanceof String)) {
+	      throw new Error("Option 'frameOfReferenceUID' must have type String.");
+	    }
+
+	    _this13.ReferencedFrameOfReferenceUID = options.frameOfReferenceUID;
+
+	    if ("fiducialUID" in options) {
+	      if (!(typeof options.fiducialUID === "string" || options.fiducialUID instanceof String)) {
+	        throw new Error("Option 'fiducialUID' must have type String.");
+	      }
+
+	      _this13.FiducialUID = fiducialUID;
+	    }
+
+	    return _this13;
+	  }
+
+	  return Scoord3DContentItem;
+	}(ContentItem);
+
+	var TcoordContentItem =
+	/*#__PURE__*/
+	function (_ContentItem14) {
+	  _inherits(TcoordContentItem, _ContentItem14);
+
+	  function TcoordContentItem(options) {
+	    var _this14;
+
+	    _classCallCheck(this, TcoordContentItem);
+
+	    _this14 = _possibleConstructorReturn(this, _getPrototypeOf(TcoordContentItem).call(this, {
+	      name: options.name,
+	      relationshipType: options.relationshipType,
+	      valueType: ValueTypes.TCOORD
+	    }));
+
+	    if (options.temporalRangeType === undefined) {
+	      throw new Error("Option 'temporalRangeType' is required for TcoordContentItem.");
+	    }
+
+	    if (Object.values(TemporalRangeTypes).indexOf(options.temporalRangeType) === -1) {
+	      throw new Error("Invalid temporal range type '".concat(options.temporalRangeType, "'."));
+	    }
+
+	    if (options.referencedSamplePositions === undefined) {
+	      if (!(_typeof(options.referencedSamplePositions) === "object" || options.referencedSamplePositions instanceof Array)) {
+	        throw new Error("Option 'referencedSamplePositions' must have type Array.");
+	      } // TODO: ensure values are integers
+
+
+	      _this14.ReferencedSamplePositions = options.referencedSamplePositions;
+	    } else if (options.referencedTimeOffsets === undefined) {
+	      if (!(_typeof(options.referencedTimeOffsets) === "object" || options.referencedTimeOffsets instanceof Array)) {
+	        throw new Error("Option 'referencedTimeOffsets' must have type Array.");
+	      } // TODO: ensure values are floats
+
+
+	      _this14.ReferencedTimeOffsets = options.referencedTimeOffsets;
+	    } else if (options.referencedDateTime === undefined) {
+	      if (!(_typeof(options.referencedDateTime) === "object" || options.referencedDateTime instanceof Array)) {
+	        throw new Error("Option 'referencedDateTime' must have type Array.");
+	      }
+
+	      _this14.ReferencedDateTime = options.referencedDateTime;
+	    } else {
+	      throw new Error("One of the following options is required for TcoordContentItem: " + "'referencedSamplePositions', 'referencedTimeOffsets', or " + "'referencedDateTime'.");
+	    }
+
+	    return _this14;
+	  }
+
+	  return TcoordContentItem;
+	}(ContentItem);
+
+	var valueTypes = /*#__PURE__*/Object.freeze({
+		__proto__: null,
+		CodeContentItem: CodeContentItem,
+		ContainerContentItem: ContainerContentItem,
+		ContentSequence: ContentSequence$1,
+		CompositeContentItem: CompositeContentItem,
+		DateContentItem: DateContentItem,
+		DateTimeContentItem: DateTimeContentItem,
+		GraphicTypes: GraphicTypes,
+		GraphicTypes3D: GraphicTypes3D,
+		ImageContentItem: ImageContentItem,
+		NumContentItem: NumContentItem,
+		PNameContentItem: PNameContentItem,
+		PixelOriginInterpretations: PixelOriginInterpretations,
+		RelationshipTypes: RelationshipTypes,
+		ScoordContentItem: ScoordContentItem,
+		Scoord3DContentItem: Scoord3DContentItem,
+		TcoordContentItem: TcoordContentItem,
+		TemporalRangeTypes: TemporalRangeTypes,
+		TextContentItem: TextContentItem,
+		TimeContentItem: TimeContentItem,
+		UIDRefContentItem: UIDRefContentItem,
+		ValueTypes: ValueTypes
+	});
+
+	var LongitudinalTemporalOffsetFromEvent =
+	/*#__PURE__*/
+	function (_NumContentItem) {
+	  _inherits(LongitudinalTemporalOffsetFromEvent, _NumContentItem);
+
+	  function LongitudinalTemporalOffsetFromEvent(options) {
+	    var _this;
+
+	    _classCallCheck(this, LongitudinalTemporalOffsetFromEvent);
+
+	    _this = _possibleConstructorReturn(this, _getPrototypeOf(LongitudinalTemporalOffsetFromEvent).call(this, {
+	      name: new CodedConcept({
+	        value: "128740",
+	        meaning: "Longitudinal Temporal Offset from Event",
+	        schemeDesignator: "DCM"
+	      }),
+	      value: options.value,
+	      unit: options.unit,
+	      relationshipType: RelationshipTypes.HAS_OBS_CONTEXT
+	    }));
+	    _this.ContentSequence = new ContentSequence$1();
+	    var item = new CodeContentItem({
+	      name: new CodedConcept({
+	        value: "128741",
+	        meaning: "Longitudinal Temporal Event Type",
+	        schemeDesignator: "DCM"
+	      }),
+	      value: options.eventType,
+	      relationshipType: RelationshipTypes.HAS_CONCEPT_MOD
+	    });
+
+	    _this.ContentSequence.push(item);
+
+	    return _this;
+	  }
+
+	  return LongitudinalTemporalOffsetFromEvent;
+	}(NumContentItem);
+
+	var SourceImageForRegion =
+	/*#__PURE__*/
+	function (_ImageContentItem) {
+	  _inherits(SourceImageForRegion, _ImageContentItem);
+
+	  function SourceImageForRegion(options) {
+	    _classCallCheck(this, SourceImageForRegion);
+
+	    return _possibleConstructorReturn(this, _getPrototypeOf(SourceImageForRegion).call(this, {
+	      name: new CodedConcept({
+	        value: "121324",
+	        meaning: "Source Image",
+	        schemeDesignator: "DCM"
+	      }),
+	      referencedSOPClassUID: options.referencedSOPClassUID,
+	      referencedSOPInstanceUID: options.referencedSOPInstanceUID,
+	      referencedFrameNumbers: options.referencedFrameNumbers,
+	      relationshipType: RelationshipTypes.SELECTED_FROM
+	    }));
+	  }
+
+	  return SourceImageForRegion;
+	}(ImageContentItem);
+
+	var SourceImageForSegmentation =
+	/*#__PURE__*/
+	function (_ImageContentItem2) {
+	  _inherits(SourceImageForSegmentation, _ImageContentItem2);
+
+	  function SourceImageForSegmentation(options) {
+	    _classCallCheck(this, SourceImageForSegmentation);
+
+	    return _possibleConstructorReturn(this, _getPrototypeOf(SourceImageForSegmentation).call(this, {
+	      name: new CodedConcept({
+	        value: "121233",
+	        meaning: "Source Image for Segmentation",
+	        schemeDesignator: "DCM"
+	      }),
+	      referencedSOPClassUID: options.referencedSOPClassUID,
+	      referencedSOPInstanceUID: options.referencedSOPInstanceUID,
+	      referencedFrameNumbers: options.referencedFrameNumbers,
+	      relationshipType: RelationshipTypes.SELECTED_FROM
+	    }));
+	  }
+
+	  return SourceImageForSegmentation;
+	}(ImageContentItem);
+
+	var SourceSeriesForSegmentation =
+	/*#__PURE__*/
+	function (_UIDRefContentItem) {
+	  _inherits(SourceSeriesForSegmentation, _UIDRefContentItem);
+
+	  function SourceSeriesForSegmentation(options) {
+	    _classCallCheck(this, SourceSeriesForSegmentation);
+
+	    return _possibleConstructorReturn(this, _getPrototypeOf(SourceSeriesForSegmentation).call(this, {
+	      name: new CodedConcept({
+	        value: "121232",
+	        meaning: "Source Series for Segmentation",
+	        schemeDesignator: "DCM"
+	      }),
+	      value: options.referencedSeriesInstanceUID,
+	      relationshipType: RelationshipTypes.CONTAINS
+	    }));
+	  }
+
+	  return SourceSeriesForSegmentation;
+	}(UIDRefContentItem);
+
+	var ImageRegion =
+	/*#__PURE__*/
+	function (_ScoordContentItem) {
+	  _inherits(ImageRegion, _ScoordContentItem);
+
+	  function ImageRegion(options) {
+	    var _this2;
+
+	    _classCallCheck(this, ImageRegion);
+
+	    _this2 = _possibleConstructorReturn(this, _getPrototypeOf(ImageRegion).call(this, {
+	      name: new CodedConcept({
+	        value: "111030",
+	        meaning: "Image Region",
+	        schemeDesignator: "DCM"
+	      }),
+	      graphicType: options.graphicType,
+	      graphicData: options.graphicData,
+	      pixelOriginInterpretation: options.pixelOriginInterpretation,
+	      relationshipType: RelationshipTypes.CONTAINS
+	    }));
+
+	    if (options.graphicType === GraphicTypes.MULTIPOINT) {
+	      throw new Error("Graphic type 'MULTIPOINT' is not valid for region.");
+	    }
+
+	    if (options.sourceImage === undefined) {
+	      throw Error("Option 'sourceImage' is required for ImageRegion.");
+	    }
+
+	    if (!(options.sourceImage || options.sourceImage.constructor === SourceImageForRegion)) {
+	      throw new Error("Option 'sourceImage' of ImageRegion must have type " + "SourceImageForRegion.");
+	    }
+
+	    _this2.ContentSequence = new ContentSequence$1();
+
+	    _this2.ContentSequence.push(options.sourceImage);
+
+	    return _this2;
+	  }
+
+	  return ImageRegion;
+	}(ScoordContentItem);
+
+	var ImageRegion3D =
+	/*#__PURE__*/
+	function (_Scoord3DContentItem) {
+	  _inherits(ImageRegion3D, _Scoord3DContentItem);
+
+	  function ImageRegion3D(options) {
+	    var _this3;
+
+	    _classCallCheck(this, ImageRegion3D);
+
+	    _this3 = _possibleConstructorReturn(this, _getPrototypeOf(ImageRegion3D).call(this, {
+	      name: new CodedConcept({
+	        value: "111030",
+	        meaning: "Image Region",
+	        schemeDesignator: "DCM"
+	      }),
+	      graphicType: options.graphicType,
+	      graphicData: options.graphicData,
+	      frameOfReferenceUID: options.frameOfReferenceUID,
+	      relationshipType: RelationshipTypes.CONTAINS
+	    }));
+
+	    if (options.graphicType === GraphicTypes3D.MULTIPOINT) {
+	      throw new Error("Graphic type 'MULTIPOINT' is not valid for region.");
+	    }
+
+	    if (options.graphicType === GraphicTypes3D.ELLIPSOID) {
+	      throw new Error("Graphic type 'ELLIPSOID' is not valid for region.");
+	    }
+
+	    return _this3;
+	  }
+
+	  return ImageRegion3D;
+	}(Scoord3DContentItem);
+
+	var VolumeSurface =
+	/*#__PURE__*/
+	function (_Scoord3DContentItem2) {
+	  _inherits(VolumeSurface, _Scoord3DContentItem2);
+
+	  function VolumeSurface(options) {
+	    var _this4;
+
+	    _classCallCheck(this, VolumeSurface);
+
+	    _this4 = _possibleConstructorReturn(this, _getPrototypeOf(VolumeSurface).call(this, {
+	      name: new CodedConcept({
+	        value: "121231",
+	        meaning: "Volume Surface",
+	        schemeDesignator: "DCM"
+	      }),
+	      graphicType: options.graphicType,
+	      graphicData: options.graphicData,
+	      frameOfFeferenceUID: options.frameOfFeferenceUID,
+	      relationshipType: RelationshipTypes.CONTAINS
+	    }));
+
+	    if (options.graphicType !== GraphicTypes3D.ELLIPSOID) {
+	      throw new Error("Graphic type for volume surface must be 'ELLIPSOID'.");
+	    }
+
+	    _this4.ContentSequence = new ContentSequence$1();
+
+	    if (options.sourceImages) {
+	      options.sourceImages.forEach(function (image) {
+	        if (!(image || image.constructor === SourceImageForRegion)) {
+	          throw new Error("Items of option 'sourceImages' of VolumeSurface " + "must have type SourceImageForRegion.");
+	        }
+
+	        _this4.ContentSequence.push(image);
+	      });
+	    } else if (options.sourceSeries) {
+	      if (!(options.sourceSeries || options.sourceSeries.constructor === SourceSeriesForRegion)) {
+	        throw new Error("Option 'sourceSeries' of VolumeSurface " + "must have type SourceSeriesForRegion.");
+	      }
+
+	      _this4.ContentSequence.push(options.sourceSeries);
+	    } else {
+	      throw new Error("One of the following two options must be provided: " + "'sourceImage' or 'sourceSeries'.");
+	    }
+
+	    return _this4;
+	  }
+
+	  return VolumeSurface;
+	}(Scoord3DContentItem);
+
+	var ReferencedRealWorldValueMap =
+	/*#__PURE__*/
+	function (_CompositeContentItem) {
+	  _inherits(ReferencedRealWorldValueMap, _CompositeContentItem);
+
+	  function ReferencedRealWorldValueMap(options) {
+	    _classCallCheck(this, ReferencedRealWorldValueMap);
+
+	    return _possibleConstructorReturn(this, _getPrototypeOf(ReferencedRealWorldValueMap).call(this, {
+	      name: new CodedConcept({
+	        value: "126100",
+	        meaning: "Real World Value Map used for measurement",
+	        schemeDesignator: "DCM"
+	      }),
+	      referencedSOPClassUID: option.referencedSOPClassUID,
+	      referencedSOPInstanceUID: options.referencedSOPInstanceUID,
+	      relationshipType: RelationshipTypes.CONTAINS
+	    }));
+	  }
+
+	  return ReferencedRealWorldValueMap;
+	}(CompositeContentItem);
+
+	var FindingSite =
+	/*#__PURE__*/
+	function (_CodeContentItem) {
+	  _inherits(FindingSite, _CodeContentItem);
+
+	  function FindingSite(options) {
+	    var _this5;
+
+	    _classCallCheck(this, FindingSite);
+
+	    _this5 = _possibleConstructorReturn(this, _getPrototypeOf(FindingSite).call(this, {
+	      name: new CodedConcept({
+	        value: "363698007",
+	        meaning: "Finding Site",
+	        schemeDesignator: "SCT"
+	      }),
+	      value: options.anatomicLocation,
+	      relationshipType: RelationshipTypes.HAS_CONCEPT_MOD
+	    }));
+	    _this5.ContentSequence = new ContentSequence$1();
+
+	    if (options.laterality) {
+	      var item = new CodeContentItem({
+	        name: new CodedConcept({
+	          value: "272741003",
+	          meaning: "Laterality",
+	          schemeDesignator: "SCT"
+	        }),
+	        value: options.laterality,
+	        relationshipType: RelationshipTypes.HAS_CONCEPT_MOD
+	      });
+
+	      _this5.ContentSequence.push(item);
+	    }
+
+	    if (options.topographicalModifier) {
+	      var _item = new CodeContentItem({
+	        name: new CodedConcept({
+	          value: "106233006",
+	          meaning: "Topographical Modifier",
+	          schemeDesignator: "SCT"
+	        }),
+	        value: options.topographicalModifier,
+	        relationshipType: RelationshipTypes.HAS_CONCEPT_MOD
+	      });
+
+	      _this5.ContentSequence.push(_item);
+	    }
+
+	    return _this5;
+	  }
+
+	  return FindingSite;
+	}(CodeContentItem);
+
+	var ReferencedSegmentationFrame =
+	/*#__PURE__*/
+	function (_ContentSequence) {
+	  _inherits(ReferencedSegmentationFrame, _ContentSequence);
+
+	  function ReferencedSegmentationFrame(options) {
+	    var _this6;
+
+	    _classCallCheck(this, ReferencedSegmentationFrame);
+
+	    if (options.sopClassUID === undefined) {
+	      throw new Error("Option 'sopClassUID' is required for ReferencedSegmentationFrame.");
+	    }
+
+	    if (options.sopInstanceUID === undefined) {
+	      throw new Error("Option 'sopInstanceUID' is required for ReferencedSegmentationFrame.");
+	    }
+
+	    if (options.frameNumber === undefined) {
+	      throw new Error("Option 'frameNumber' is required for ReferencedSegmentationFrame.");
+	    }
+
+	    if (options.segmentNumber === undefined) {
+	      throw new Error("Option 'segmentNumber' is required for ReferencedSegmentationFrame.");
+	    }
+
+	    if (options.sourceImage === undefined) {
+	      throw new Error("Option 'sourceImage' is required for ReferencedSegmentationFrame.");
+	    }
+
+	    _this6 = _possibleConstructorReturn(this, _getPrototypeOf(ReferencedSegmentationFrame).call(this));
+	    var segmentationItem = ImageContentItem({
+	      name: new CodedConcept({
+	        value: "121214",
+	        meaning: "Referenced Segmentation Frame",
+	        schemeDesignator: "DCM"
+	      }),
+	      referencedSOPClassUid: options.sopClassUid,
+	      referencedSOPInstanceUid: options.sopInstanceUid,
+	      referencedFrameNumber: options.frameNumber,
+	      referencedSegmentNumber: options.segmentNumber
+	    });
+
+	    _this6.push(segmentationItem);
+
+	    if (options.sourceImage.constructor !== SourceImageForSegmentation) {
+	      throw new Error("Option 'sourceImage' must have type SourceImageForSegmentation.");
+	    }
+
+	    _this6.push(sourceImage);
+
+	    return _this6;
+	  }
+
+	  return ReferencedSegmentationFrame;
+	}(ContentSequence$1);
+
+	var ReferencedSegmentation =
+	/*#__PURE__*/
+	function (_ContentSequence2) {
+	  _inherits(ReferencedSegmentation, _ContentSequence2);
+
+	  function ReferencedSegmentation(options) {
+	    var _this7;
+
+	    _classCallCheck(this, ReferencedSegmentation);
+
+	    if (options.sopClassUID === undefined) {
+	      throw new Error("Option 'sopClassUID' is required for ReferencedSegmentation.");
+	    }
+
+	    if (options.sopInstanceUID === undefined) {
+	      throw new Error("Option 'sopInstanceUID' is required for ReferencedSegmentation.");
+	    }
+
+	    if (options.frameNumbers === undefined) {
+	      throw new Error("Option 'frameNumbers' is required for ReferencedSegmentation.");
+	    }
+
+	    if (options.segmentNumber === undefined) {
+	      throw new Error("Option 'segmentNumber' is required for ReferencedSegmentation.");
+	    }
+
+	    _this7 = _possibleConstructorReturn(this, _getPrototypeOf(ReferencedSegmentation).call(this));
+	    var segmentationItem = new ImageContentItem({
+	      name: new CodedConcept({
+	        value: "121191",
+	        meaning: "Referenced Segment",
+	        schemeDesignator: "DCM"
+	      }),
+	      referencedSOPClassUid: options.sopClassUid,
+	      referencedSOPInstanceUid: options.sopInstanceUid,
+	      referencedFrameNumber: options.frameNumbers,
+	      referencedSegmentNumber: options.segmentNumber
+	    });
+
+	    _this7.push(segmentationItem);
+
+	    if (options.sourceImages !== undefined) {
+	      options.sourceImages.forEach(function (image) {
+	        if (!image || image.constructor !== SourceImageForSegmentation) {
+	          throw new Error("Items of option 'sourceImages' must have type " + "SourceImageForSegmentation.");
+	        }
+
+	        _this7.push(image);
+	      });
+	    } else if (options.sourceSeries !== undefined) {
+	      if (options.sourceSeries.constructor !== SourceSeriesForSegmentation) {
+	        throw new Error("Option 'sourceSeries' must have type SourceSeriesForSegmentation.");
+	      }
+
+	      _this7.push(sourceSeries);
+	    } else {
+	      throw new Error("One of the following two options must be provided: " + "'sourceImages' or 'sourceSeries'.");
+	    }
+
+	    return _this7;
+	  }
+
+	  return ReferencedSegmentation;
+	}(ContentSequence$1);
+
+	var contentItems = /*#__PURE__*/Object.freeze({
+		__proto__: null,
+		FindingSite: FindingSite,
+		LongitudinalTemporalOffsetFromEvent: LongitudinalTemporalOffsetFromEvent,
+		ReferencedRealWorldValueMap: ReferencedRealWorldValueMap,
+		ImageRegion: ImageRegion,
+		ImageRegion3D: ImageRegion3D,
+		ReferencedSegmentation: ReferencedSegmentation,
+		ReferencedSegmentationFrame: ReferencedSegmentationFrame,
+		VolumeSurface: VolumeSurface,
+		SourceImageForRegion: SourceImageForRegion,
+		SourceImageForSegmentation: SourceImageForSegmentation,
+		SourceSeriesForSegmentation: SourceSeriesForSegmentation
+	});
+
+	var Template =
+	/*#__PURE__*/
+	function (_ContentSequence) {
+	  _inherits(Template, _ContentSequence);
+
+	  function Template() {
+	    var _getPrototypeOf2;
+
+	    _classCallCheck(this, Template);
+
+	    for (var _len = arguments.length, args = new Array(_len), _key = 0; _key < _len; _key++) {
+	      args[_key] = arguments[_key];
+	    }
+
+	    return _possibleConstructorReturn(this, (_getPrototypeOf2 = _getPrototypeOf(Template)).call.apply(_getPrototypeOf2, [this].concat(args)));
+	  }
+
+	  return Template;
+	}(ContentSequence$1);
+
+	var Measurement =
+	/*#__PURE__*/
+	function (_Template) {
+	  _inherits(Measurement, _Template);
+
+	  function Measurement(options) {
+	    var _valueItem$ContentSeq;
+
+	    var _this;
+
+	    _classCallCheck(this, Measurement);
+
+	    _this = _possibleConstructorReturn(this, _getPrototypeOf(Measurement).call(this));
+	    var valueItem = new NumContentItem({
+	      name: options.name,
+	      value: options.value,
+	      unit: options.unit,
+	      qualifier: options.qualifier,
+	      relationshipType: RelationshipTypes.CONTAINS
+	    });
+	    valueItem.ContentSequence = new ContentSequence$1();
+
+	    if (options.trackingIdentifier === undefined) {
+	      throw new Error("Option 'trackingIdentifier' is required for Measurement.");
+	    }
+
+	    if (options.trackingIdentifier.constructor === TrackingIdentifier) {
+	      throw new Error("Option 'trackingIdentifier' must have type TrackingIdentifier.");
+	    }
+
+	    (_valueItem$ContentSeq = valueItem.ContentSequence).push.apply(_valueItem$ContentSeq, _toConsumableArray(options.trackingIdentifier));
+
+	    if (options.method !== undefined) {
+	      var methodItem = new CodeContentItem({
+	        name: new CodedConcept({
+	          value: "370129005",
+	          meaning: "Measurement Method",
+	          schemeDesignator: "SCT"
+	        }),
+	        value: options.method,
+	        relationshipType: RelationshipTypes.HAS_CONCEPT_MOD
+	      });
+	      valueItem.ContentSequence.push(methodItem);
+	    }
+
+	    if (options.derivation !== undefined) {
+	      var derivationItem = new CodeContentItem({
+	        name: new CodedConcept({
+	          value: "121401",
+	          meaning: "Derivation",
+	          schemeDesignator: "DCM"
+	        }),
+	        value: options.derivation,
+	        relationshipType: RelationshipTypes.HAS_CONCEPT_MOD
+	      });
+	      valueItem.ContentSequence.push(derivationItem);
+	    }
+
+	    if (options.findingSites !== undefined) {
+	      if (!(_typeof(options.findingSites) === "object" || options.findingSites instanceof Array)) {
+	        throw new Error("Option 'findingSites' must have type Array.");
+	      }
+
+	      options.findingSites.forEach(function (site) {
+	        if (!site || site.constructor !== FindingSite) {
+	          throw new Error("Items of option 'findingSites' must have type FindingSite.");
+	        }
+
+	        valueItem.ContentSequence.push(site);
+	      });
+	    }
+
+	    if (options.properties !== undefined) {
+	      var _valueItem$ContentSeq2;
+
+	      if (options.properties.constructor !== MeasurementProperties) {
+	        throw new Error("Option 'properties' must have type MeasurementProperties.");
+	      }
+
+	      (_valueItem$ContentSeq2 = valueItem.ContentSequence).push.apply(_valueItem$ContentSeq2, _toConsumableArray(options.properties));
+	    }
+
+	    if (options.referencedRegions !== undefined) {
+	      if (!(_typeof(options.referencedRegions) === "object" || options.referencedRegions instanceof Array)) {
+	        throw new Error("Option 'referencedRegions' must have type Array.");
+	      }
+
+	      options.referencedRegions.forEach(function (region) {
+	        if (!region || region.constructor !== ImageRegion && region.constructor !== ImageRegion3D) {
+	          throw new Error("Items of option 'referencedRegion' must have type " + "ImageRegion or ImageRegion3D.");
+	        }
+
+	        valueItem.ContentSequence.push(region);
+	      });
+	    } else if (options.referencedVolume !== undefined) {
+	      if (options.referencedVolume.constructor !== VolumeSurface) {
+	        throw new Error("Option 'referencedVolume' must have type VolumeSurface.");
+	      }
+
+	      valueItem.ContentSequence.push(options.referencedVolume);
+	    } else if (options.referencedSegmentation !== undefined) {
+	      if (options.referencedSegmentation.constructor !== ReferencedSegmentation && options.referencedSegmentation.constructor !== ReferencedSegmentationFrame) {
+	        throw new Error("Option 'referencedSegmentation' must have type " + "ReferencedSegmentation or ReferencedSegmentationFrame.");
+	      }
+
+	      valueItem.ContentSequence.push(options.referencedSegmentation);
+	    }
+
+	    if (options.referencedRealWorldValueMap !== undefined) {
+	      if (options.referencedRealWorldValueMap.constructor !== ReferencedRealWorldValueMap) {
+	        throw new Error("Option 'referencedRealWorldValueMap' must have type " + "ReferencedRealWorldValueMap.");
+	      }
+
+	      valueItem.ContentSequence.push(options.referencedRealWorldValueMap);
+	    }
+
+	    if (options.algorithmId !== undefined) {
+	      var _valueItem$ContentSeq3;
+
+	      if (options.algorithmId.constructor !== AlgorithmIdentification) {
+	        throw new Error("Option 'algorithmId' must have type AlgorithmIdentification.");
+	      }
+
+	      (_valueItem$ContentSeq3 = valueItem.ContentSequence).push.apply(_valueItem$ContentSeq3, _toConsumableArray(options.algorithmId));
+	    }
+
+	    _this.push(valueItem);
+
+	    return _this;
+	  }
+
+	  return Measurement;
+	}(Template);
+
+	var MeasurementProperties =
+	/*#__PURE__*/
+	function (_Template2) {
+	  _inherits(MeasurementProperties, _Template2);
+
+	  function MeasurementProperties(options) {
+	    var _this2;
+
+	    _classCallCheck(this, MeasurementProperties);
+
+	    _this2 = _possibleConstructorReturn(this, _getPrototypeOf(MeasurementProperties).call(this));
+
+	    if (options.normality !== undefined) {
+	      var normalityItem = new CodeContentItem({
+	        name: new CodedConcept({
+	          value: "121402",
+	          schemeDesignator: "DCM",
+	          meaning: "Normality"
+	        }),
+	        value: options.normality,
+	        relationshipType: RelationshipTypes.HAS_PROPERTIES
+	      });
+
+	      _this2.push(normalityItem);
+	    }
+
+	    if (options.measurementStatisticalProperties !== undefined) {
+	      var _this3;
+
+	      if (options.measurementStatisticalProperties.constructor !== MeasurementStatisticalProperties) {
+	        throw new Error("Option 'measurmentStatisticalProperties' must have type " + "MeasurementStatisticalProperties.");
+	      }
+
+	      (_this3 = _this2).push.apply(_this3, _toConsumableArray(measurementStatisticalProperties));
+	    }
+
+	    if (options.normalRangeProperties !== undefined) {
+	      var _this4;
+
+	      if (options.normalRangeProperties.constructor !== NormalRangeProperties) {
+	        throw new Error("Option 'normalRangeProperties' must have type NormalRangeProperties.");
+	      }
+
+	      (_this4 = _this2).push.apply(_this4, _toConsumableArray(normalRangeProperties));
+	    }
+
+	    if (options.levelOfSignificance !== undefined) {
+	      var levelOfSignificanceItem = new CodeContentItem({
+	        name: new CodedConcept({
+	          value: "121403",
+	          schemeDesignator: "DCM",
+	          meaning: "Level of Significance"
+	        }),
+	        value: options.levelOfSignificance,
+	        relationshipType: RelationshipTypes.HAS_PROPERTIES
+	      });
+
+	      _this2.push(levelOfSignificanceItem);
+	    }
+
+	    if (options.selectionStatus !== undefined) {
+	      var selectionStatusItem = new CodeContentItem({
+	        name: new CodedConcept({
+	          value: "121404",
+	          schemeDesignator: "DCM",
+	          meaning: "Selection Status"
+	        }),
+	        value: options.selectionStatus,
+	        relationshipType: RelationshipTypes.HAS_PROPERTIES
+	      });
+
+	      _this2.push(selectionStatusItem);
+	    }
+
+	    if (options.upperMeasurementUncertainty !== undefined) {
+	      var upperMeasurementUncertaintyItem = new CodeContentItem({
+	        name: new CodedConcept({
+	          value: "R-00364",
+	          schemeDesignator: "SRT",
+	          meaning: "Range of Upper Measurement Uncertainty"
+	        }),
+	        value: options.upperMeasurementUncertainty,
+	        relationshipType: RelationshipTypes.HAS_PROPERTIES
+	      });
+
+	      _this2.push(upperMeasurementUncertaintyItem);
+	    }
+
+	    if (options.lowerMeasurementUncertainty !== undefined) {
+	      var lowerMeasurementUncertaintyItem = new CodeContentItem({
+	        name: new CodedConcept({
+	          value: "R-00362",
+	          schemeDesignator: "SRT",
+	          meaning: "Range of Lower Measurement Uncertainty"
+	        }),
+	        value: options.lowerMeasurementUncertainty,
+	        relationshipType: RelationshipTypes.HAS_PROPERTIES
+	      });
+
+	      _this2.push(lowerMeasurementUncertaintyItem);
+	    }
+
+	    return _this2;
+	  }
+
+	  return MeasurementProperties;
+	}(Template);
+
+	var MeasurementStatisticalProperties =
+	/*#__PURE__*/
+	function (_Template3) {
+	  _inherits(MeasurementStatisticalProperties, _Template3);
+
+	  function MeasurementStatisticalProperties(options) {
+	    var _this5;
+
+	    _classCallCheck(this, MeasurementStatisticalProperties);
+
+	    _this5 = _possibleConstructorReturn(this, _getPrototypeOf(MeasurementStatisticalProperties).call(this));
+
+	    if (options.values === undefined) {
+	      throw new Error("Option 'values' is required for MeasurementStatisticalProperties.");
+	    }
+
+	    if (!(_typeof(options.values) === "object" || options.values instanceof Array)) {
+	      throw new Error("Option 'values' must have type Array.");
+	    }
+
+	    options.values.forEach(function (value) {
+	      if (!options.concept || options.concept.constructor !== NumContentItem) {
+	        throw new Error("Items of option 'values' must have type NumContentItem.");
+	      }
+
+	      _this5.push(value);
+	    });
+
+	    if (options.description !== undefined) {
+	      var descriptionItem = new TextContentItem({
+	        name: new CodedConcept({
+	          value: "121405",
+	          schemeDesignator: "DCM",
+	          meaning: "Population Description"
+	        }),
+	        value: options.authority,
+	        relationshipType: RelationshipTypes.HAS_PROPERTIES
+	      });
+
+	      _this5.push(authorityItem);
+	    }
+
+	    if (options.authority !== undefined) {
+	      var _authorityItem = new TextContentItem({
+	        name: new CodedConcept({
+	          value: "121406",
+	          schemeDesignator: "DCM",
+	          meaning: "Population Authority"
+	        }),
+	        value: options.authority,
+	        relationshipType: RelationshipTypes.HAS_PROPERTIES
+	      });
+
+	      _this5.push(_authorityItem);
+	    }
+
+	    return _this5;
+	  }
+
+	  return MeasurementStatisticalProperties;
+	}(Template);
+
+	var NormalRangeProperties =
+	/*#__PURE__*/
+	function (_Template4) {
+	  _inherits(NormalRangeProperties, _Template4);
+
+	  function NormalRangeProperties(options) {
+	    var _this6;
+
+	    _classCallCheck(this, NormalRangeProperties);
+
+	    _this6 = _possibleConstructorReturn(this, _getPrototypeOf(NormalRangeProperties).call(this));
+
+	    if (options.values === undefined) {
+	      throw new Error("Option 'values' is required for NormalRangeProperties.");
+	    }
+
+	    if (!(_typeof(options.values) === "object" || options.values instanceof Array)) {
+	      throw new Error("Option 'values' must have type Array.");
+	    }
+
+	    options.values.forEach(function (value) {
+	      if (!options.concept || options.concept.constructor !== NumContentItem) {
+	        throw new Error("Items of option 'values' must have type NumContentItem.");
+	      }
+
+	      _this6.push(value);
+	    });
+
+	    if (options.description !== undefined) {
+	      var descriptionItem = new TextContentItem({
+	        name: new CodedConcept({
+	          value: "121407",
+	          schemeDesignator: "DCM",
+	          meaning: "Normal Range Description"
+	        }),
+	        value: options.authority,
+	        relationshipType: RelationshipTypes.HAS_PROPERTIES
+	      });
+
+	      _this6.push(authorityItem);
+	    }
+
+	    if (options.authority !== undefined) {
+	      var _authorityItem2 = new TextContentItem({
+	        name: new CodedConcept({
+	          value: "121408",
+	          schemeDesignator: "DCM",
+	          meaning: "Normal Range Authority"
+	        }),
+	        value: options.authority,
+	        relationshipType: RelationshipTypes.HAS_PROPERTIES
+	      });
+
+	      _this6.push(_authorityItem2);
+	    }
+
+	    return _this6;
+	  }
+
+	  return NormalRangeProperties;
+	}(Template);
+
+	var ObservationContext =
+	/*#__PURE__*/
+	function (_Template5) {
+	  _inherits(ObservationContext, _Template5);
+
+	  function ObservationContext(options) {
+	    var _this8;
+
+	    var _this7;
+
+	    _classCallCheck(this, ObservationContext);
+
+	    _this7 = _possibleConstructorReturn(this, _getPrototypeOf(ObservationContext).call(this));
+
+	    if (options.observerPersonContext === undefined) {
+	      throw new Error("Option 'observerPersonContext' is required for ObservationContext.");
+	    }
+
+	    if (options.observerPersonContext.constructor !== ObserverContext) {
+	      throw new Error("Option 'observerPersonContext' must have type ObserverContext");
+	    }
+
+	    (_this8 = _this7).push.apply(_this8, _toConsumableArray(options.observerPersonContext));
+
+	    if (options.observerDeviceContext !== undefined) {
+	      var _this9;
+
+	      if (options.observerDeviceContext.constructor !== ObserverContext) {
+	        throw new Error("Option 'observerDeviceContext' must have type ObserverContext");
+	      }
+
+	      (_this9 = _this7).push.apply(_this9, _toConsumableArray(options.observerDeviceContext));
+	    }
+
+	    if (options.subjectContext !== undefined) {
+	      var _this10;
+
+	      if (options.subjectContext.constructor !== SubjectContext) {
+	        throw new Error("Option 'subjectContext' must have type SubjectContext");
+	      }
+
+	      (_this10 = _this7).push.apply(_this10, _toConsumableArray(options.subjectContext));
+	    }
+
+	    return _this7;
+	  }
+
+	  return ObservationContext;
+	}(Template);
+
+	var ObserverContext =
+	/*#__PURE__*/
+	function (_Template6) {
+	  _inherits(ObserverContext, _Template6);
+
+	  function ObserverContext(options) {
+	    var _this12;
+
+	    var _this11;
+
+	    _classCallCheck(this, ObserverContext);
+
+	    _this11 = _possibleConstructorReturn(this, _getPrototypeOf(ObserverContext).call(this));
+
+	    if (options.observerType === undefined) {
+	      throw new Error("Option 'observerType' is required for ObserverContext.");
+	    } else {
+	      if (options.observerType.constructor !== Code && options.observerType.constructor !== CodedConcept) {
+	        throw new Error("Option 'observerType' must have type Code or CodedConcept.");
+	      }
+	    }
+
+	    var observerTypeItem = new CodeContentItem({
+	      name: new CodedConcept({
+	        value: "121005",
+	        meaning: "Observer Type",
+	        schemeDesignator: "DCM"
+	      }),
+	      value: options.observerType,
+	      relationshipType: RelationshipTypes.HAS_OBS_CONTEXT
+	    });
+
+	    _this11.push(observerTypeItem);
+
+	    if (options.observerIdentifyingAttributes === undefined) {
+	      throw new Error("Option 'observerIdentifyingAttributes' is required for ObserverContext.");
+	    } // FIXME
+
+
+	    var person = new CodedConcept({
+	      value: "121006",
+	      schemeDesignator: "DCM",
+	      meaning: "Person"
+	    });
+	    var device = new CodedConcept({
+	      value: "121007",
+	      schemeDesignator: "DCM",
+	      meaning: "Device"
+	    });
+
+	    if (person.equals(options.observerType)) {
+	      if (options.observerIdentifyingAttributes.constructor !== PersonObserverIdentifyingAttributes) {
+	        throw new Error("Option 'observerIdentifyingAttributes' must have type " + "PersonObserverIdentifyingAttributes for 'Person' observer type.");
+	      }
+	    } else if (device.equals(options.observerType)) {
+	      if (options.observerIdentifyingAttributes.constructor !== DeviceObserverIdentifyingAttributes) {
+	        throw new Error("Option 'observerIdentifyingAttributes' must have type " + "DeviceObserverIdentifyingAttributes for 'Device' observer type.");
+	      }
+	    } else {
+	      throw new Error("Option 'oberverType' must be either 'Person' or 'Device'.");
+	    }
+
+	    (_this12 = _this11).push.apply(_this12, _toConsumableArray(options.observerIdentifyingAttributes));
+
+	    return _this11;
+	  }
+
+	  return ObserverContext;
+	}(Template);
+
+	var PersonObserverIdentifyingAttributes =
+	/*#__PURE__*/
+	function (_Template7) {
+	  _inherits(PersonObserverIdentifyingAttributes, _Template7);
+
+	  function PersonObserverIdentifyingAttributes(options) {
+	    var _this13;
+
+	    _classCallCheck(this, PersonObserverIdentifyingAttributes);
+
+	    _this13 = _possibleConstructorReturn(this, _getPrototypeOf(PersonObserverIdentifyingAttributes).call(this));
+
+	    if (options.name === undefined) {
+	      throw new Error("Option 'name' is required for PersonObserverIdentifyingAttributes.");
+	    }
+
+	    var nameItem = new PNameContentItem({
+	      name: new CodedConcept({
+	        value: "121008",
+	        meaning: "Person Observer Name",
+	        schemeDesignator: "DCM"
+	      }),
+	      value: options.name,
+	      relationshipType: RelationshipTypes.HAS_OBS_CONTEXT
+	    });
+
+	    _this13.push(nameItem);
+
+	    if (options.loginName !== undefined) {
+	      var loginNameItem = new TextContentItem({
+	        name: new CodedConcept({
+	          value: "128774",
+	          meaning: "Person Observer's Login Name",
+	          schemeDesignator: "DCM"
+	        }),
+	        value: options.loginName,
+	        relationshipType: RelationshipTypes.HAS_OBS_CONTEXT
+	      });
+
+	      _this13.push(loginNameItem);
+	    }
+
+	    if (options.organizationName !== undefined) {
+	      var organizationNameItem = new TextContentItem({
+	        name: new CodedConcept({
+	          value: "121009",
+	          meaning: "Person Observer's Organization Name",
+	          schemeDesignator: "DCM"
+	        }),
+	        value: options.organizationName,
+	        relationshipType: RelationshipTypes.HAS_OBS_CONTEXT
+	      });
+
+	      _this13.push(organizationNameItem);
+	    }
+
+	    if (options.roleInOrganization !== undefined) {
+	      var roleInOrganizationItem = new CodeContentItem({
+	        name: new CodedConcept({
+	          value: "121010",
+	          meaning: "Person Observer's Role in the Organization",
+	          schemeDesignator: "DCM"
+	        }),
+	        value: options.roleInOrganization,
+	        relationshipType: RelationshipTypes.HAS_OBS_CONTEXT
+	      });
+
+	      _this13.push(roleInOrganizationItem);
+	    }
+
+	    if (options.roleInProcedure !== undefined) {
+	      var roleInProcedureItem = new CodeContentItem({
+	        name: new CodedConcept({
+	          value: "121011",
+	          meaning: "Person Observer's Role in this Procedure",
+	          schemeDesignator: "DCM"
+	        }),
+	        value: options.roleInProcedure,
+	        relationshipType: RelationshipTypes.HAS_OBS_CONTEXT
+	      });
+
+	      _this13.push(roleInProcedureItem);
+	    }
+
+	    return _this13;
+	  }
+
+	  return PersonObserverIdentifyingAttributes;
+	}(Template);
+
+	var DeviceObserverIdentifyingAttributes =
+	/*#__PURE__*/
+	function (_Template8) {
+	  _inherits(DeviceObserverIdentifyingAttributes, _Template8);
+
+	  function DeviceObserverIdentifyingAttributes(options) {
+	    var _this14;
+
+	    _classCallCheck(this, DeviceObserverIdentifyingAttributes);
+
+	    _this14 = _possibleConstructorReturn(this, _getPrototypeOf(DeviceObserverIdentifyingAttributes).call(this));
+
+	    if (options.uid === undefined) {
+	      throw new Error("Option 'uid' is required for DeviceObserverIdentifyingAttributes.");
+	    }
+
+	    var deviceObserverItem = new UIDRefContentItem({
+	      name: new CodedConcept({
+	        value: "121012",
+	        meaning: "Device Observer UID",
+	        schemeDesignator: "DCM"
+	      }),
+	      value: options.uid,
+	      relationshipType: RelationshipTypes.HAS_OBS_CONTEXT
+	    });
+
+	    _this14.push(deviceObserverItem);
+
+	    if (options.manufacturerName !== undefined) {
+	      var manufacturerNameItem = new TextContentItem({
+	        name: new CodedConcept({
+	          value: "121013",
+	          meaning: "Device Observer Manufacturer",
+	          schemeDesignator: "DCM"
+	        }),
+	        value: options.manufacturerName,
+	        relationshipType: RelationshipTypes.HAS_OBS_CONTEXT
+	      });
+
+	      _this14.push(manufacturerNameItem);
+	    }
+
+	    if (options.modelName !== undefined) {
+	      var modelNameItem = new TextContentItem({
+	        name: new CodedConcept({
+	          value: "121015",
+	          meaning: "Device Observer Model Name",
+	          schemeDesignator: "DCM"
+	        }),
+	        value: options.modelName,
+	        relationshipType: RelationshipTypes.HAS_OBS_CONTEXT
+	      });
+
+	      _this14.push(modelNameItem);
+	    }
+
+	    if (options.serialNumber !== undefined) {
+	      var serialNumberItem = new TextContentItem({
+	        name: new CodedConcept({
+	          value: "121016",
+	          meaning: "Device Observer Serial Number",
+	          schemeDesignator: "DCM"
+	        }),
+	        value: options.serialNumber,
+	        relationshipType: RelationshipTypes.HAS_OBS_CONTEXT
+	      });
+
+	      _this14.push(serialNumberItem);
+	    }
+
+	    if (options.physicalLocation !== undefined) {
+	      var physicalLocationItem = new TextContentItem({
+	        name: new CodedConcept({
+	          value: "121017",
+	          meaning: "Device Observer Physical Location During Observation",
+	          schemeDesignator: "DCM"
+	        }),
+	        value: options.physicalLocation,
+	        relationshipType: RelationshipTypes.HAS_OBS_CONTEXT
+	      });
+
+	      _this14.push(physicalLocationItem);
+	    }
+
+	    if (options.roleInProcedure !== undefined) {
+	      var roleInProcedureItem = new CodeContentItem({
+	        name: new CodedConcept({
+	          value: "113876",
+	          meaning: "Device Role in Procedure",
+	          schemeDesignator: "DCM"
+	        }),
+	        value: options.roleInProcedure,
+	        relationshipType: RelationshipTypes.HAS_OBS_CONTEXT
+	      });
+
+	      _this14.push(roleInProcedureItem);
+	    }
+
+	    return _this14;
+	  }
+
+	  return DeviceObserverIdentifyingAttributes;
+	}(Template);
+
+	var SubjectContext =
+	/*#__PURE__*/
+	function (_Template9) {
+	  _inherits(SubjectContext, _Template9);
+
+	  function SubjectContext(options) {
+	    var _this16;
+
+	    var _this15;
+
+	    _classCallCheck(this, SubjectContext);
+
+	    _this15 = _possibleConstructorReturn(this, _getPrototypeOf(SubjectContext).call(this));
+
+	    if (options.subjectClass === undefined) {
+	      throw new Error("Option 'subjectClass' is required for SubjectContext.");
+	    }
+
+	    if (options.subjectClassSpecificContext === undefined) {
+	      throw new Error("Option 'subjectClassSpecificContext' is required for SubjectContext.");
+	    }
+
+	    var subjectClassItem = new CodeContentItem({
+	      name: new CodedConcept({
+	        value: "121024",
+	        meaning: "Subject Class",
+	        schemeDesignator: "DCM"
+	      }),
+	      value: options.subjectClass,
+	      relationshipType: RelationshipTypes.HAS_OBS_CONTEXT
+	    });
+
+	    _this15.push(subjectClassItem);
+
+	    var fetus = new CodedConcept({
+	      value: "121026 ",
+	      schemeDesignator: "DCM",
+	      meaning: "Fetus"
+	    });
+	    var specimen = new CodedConcept({
+	      value: "121027",
+	      schemeDesignator: "DCM",
+	      meaning: "Specimen"
+	    });
+	    var device = new CodedConcept({
+	      value: "121192",
+	      schemeDesignator: "DCM",
+	      meaning: "Device Subject"
+	    });
+
+	    if (fetus.equals(options.subjectClass)) {
+	      if (options.subjectClassSpecificContext.constructor !== SubjectContextFetus) {
+	        throw new Error("Option 'subjectClass' must have type " + "SubjectContextFetus for 'Fetus' subject class.");
+	      }
+	    } else if (specimen.equals(options.subjectClass)) {
+	      if (options.subjectClassSpecificContext.constructor !== SubjectContextSpecimen) {
+	        throw new Error("Option 'subjectClass' must have type " + "SubjectContextSpecimen for 'Specimen' subject class.");
+	      }
+	    } else if (device.equals(options.subjectClass)) {
+	      if (options.subjectClassSpecificContext.constructor !== SubjectContextDevice) {
+	        throw new Error("Option 'subjectClass' must have type " + "SubjectContextDevice for 'Device' subject class.");
+	      }
+	    } else {
+	      throw new Error("Option 'subjectClass' must be either 'Fetus', 'Specimen', or 'Device'.");
+	    }
+
+	    (_this16 = _this15).push.apply(_this16, _toConsumableArray(options.subjectClassSpecificContext));
+
+	    return _this15;
+	  }
+
+	  return SubjectContext;
+	}(Template);
+
+	var SubjectContextFetus =
+	/*#__PURE__*/
+	function (_Template10) {
+	  _inherits(SubjectContextFetus, _Template10);
+
+	  function SubjectContextFetus(options) {
+	    var _this17;
+
+	    _classCallCheck(this, SubjectContextFetus);
+
+	    _this17 = _possibleConstructorReturn(this, _getPrototypeOf(SubjectContextFetus).call(this));
+
+	    if (options.subjectID === undefined) {
+	      throw new Error("Option 'subjectID' is required for SubjectContextFetus.");
+	    }
+
+	    var subjectIdItem = new TextContentItem({
+	      name: new CodedConcept({
+	        value: "121030",
+	        meaning: "Subject ID",
+	        schemeDesignator: "DCM"
+	      }),
+	      value: options.subjectID,
+	      relationshipType: RelationshipTypes.HAS_OBS_CONTEXT
+	    });
+
+	    _this17.push(subjectIdItem);
+
+	    return _this17;
+	  }
+
+	  return SubjectContextFetus;
+	}(Template);
+
+	var SubjectContextSpecimen =
+	/*#__PURE__*/
+	function (_Template11) {
+	  _inherits(SubjectContextSpecimen, _Template11);
+
+	  function SubjectContextSpecimen(options) {
+	    var _this18;
+
+	    _classCallCheck(this, SubjectContextSpecimen);
+
+	    _this18 = _possibleConstructorReturn(this, _getPrototypeOf(SubjectContextSpecimen).call(this));
+
+	    if (options.uid === undefined) {
+	      throw new Error("Option 'uid' is required for SubjectContextSpecimen.");
+	    }
+
+	    var specimenUidItem = new UIDRefContentItem({
+	      name: new CodedConcept({
+	        value: "121039",
+	        meaning: "Specimen UID",
+	        schemeDesignator: "DCM"
+	      }),
+	      value: options.uid,
+	      relationshipType: RelationshipTypes.HAS_OBS_CONTEXT
+	    });
+
+	    _this18.push(specimenUidItem);
+
+	    if (options.identifier !== undefined) {
+	      var specimenIdentifierItem = new TextContentItem({
+	        name: new CodedConcept({
+	          value: "121041",
+	          meaning: "Specimen Identifier",
+	          schemeDesignator: "DCM"
+	        }),
+	        value: options.identifier,
+	        relationshipType: RelationshipTypes.HAS_OBS_CONTEXT
+	      });
+
+	      _this18.push(specimenIdentifierItem);
+	    }
+
+	    if (options.containerIdentifier !== undefined) {
+	      var containerIdentifierItem = new TextContentItem({
+	        name: new CodedConcept({
+	          value: "111700",
+	          meaning: "Specimen Container Identifier",
+	          schemeDesignator: "DCM"
+	        }),
+	        value: options.containerIdentifier,
+	        relationshipType: RelationshipTypes.HAS_OBS_CONTEXT
+	      });
+
+	      _this18.push(containerIdentifierItem);
+	    }
+
+	    if (options.specimenType !== undefined) {
+	      var specimenTypeItem = new CodeContentItem({
+	        name: new CodedConcept({
+	          value: "R-00254",
+	          meaning: "Specimen Type",
+	          schemeDesignator: "DCM"
+	        }),
+	        value: options.specimenType,
+	        relationshipType: RelationshipTypes.HAS_OBS_CONTEXT
+	      });
+
+	      _this18.push(specimenTypeItem);
+	    }
+
+	    return _this18;
+	  }
+
+	  return SubjectContextSpecimen;
+	}(Template);
+
+	var SubjectContextDevice =
+	/*#__PURE__*/
+	function (_Template12) {
+	  _inherits(SubjectContextDevice, _Template12);
+
+	  function SubjectContextDevice(options) {
+	    var _this19;
+
+	    _classCallCheck(this, SubjectContextDevice);
+
+	    if (options.name === undefined) {
+	      throw new Error("Option 'name' is required for SubjectContextDevice.");
+	    }
+
+	    var deviceNameItem = new TextContentItem({
+	      name: new CodedConcept({
+	        value: "121193",
+	        meaning: "Device Subject Name",
+	        schemeDesignator: "DCM"
+	      }),
+	      value: options.name,
+	      relationshipType: RelationshipTypes.HAS_OBS_CONTEXT
+	    });
+
+	    _this19.push(deviceNameItem);
+
+	    if (options.uid !== undefined) {
+	      var deviceUidItem = new UIDRefContentItem({
+	        name: new CodedConcept({
+	          value: "121198",
+	          meaning: "Device Subject UID",
+	          schemeDesignator: "DCM"
+	        }),
+	        value: options.uid,
+	        relationshipType: RelationshipTypes.HAS_OBS_CONTEXT
+	      });
+
+	      _this19.push(deviceUidItem);
+	    }
+
+	    if (options.manufacturerName !== undefined) {
+	      var manufacturerNameItem = new TextContentItem({
+	        name: new CodedConcept({
+	          value: "121194",
+	          meaning: "Device Subject Manufacturer",
+	          schemeDesignator: "DCM"
+	        }),
+	        value: options.manufacturerName,
+	        relationshipType: RelationshipTypes.HAS_OBS_CONTEXT
+	      });
+
+	      _this19.push(manufacturerNameItem);
+	    }
+
+	    if (options.modelName !== undefined) {
+	      var modelNameItem = new TextContentItem({
+	        name: new CodedConcept({
+	          value: "121195",
+	          meaning: "Device Subject Model Name",
+	          schemeDesignator: "DCM"
+	        }),
+	        value: options.modelName,
+	        relationshipType: RelationshipTypes.HAS_OBS_CONTEXT
+	      });
+
+	      _this19.push(modelNameItem);
+	    }
+
+	    if (options.serialNumber !== undefined) {
+	      var serialNumberItem = new TextContentItem({
+	        name: new CodedConcept({
+	          value: "121196",
+	          meaning: "Device Subject Serial Number",
+	          schemeDesignator: "DCM"
+	        }),
+	        value: options.serialNumber,
+	        relationshipType: RelationshipTypes.HAS_OBS_CONTEXT
+	      });
+
+	      _this19.push(serialNumberItem);
+	    }
+
+	    if (options.physicalLocation !== undefined) {
+	      var physicalLocationItem = new TextContentItem({
+	        name: new CodedConcept({
+	          value: "121197",
+	          meaning: "Device Subject Physical Location During Observation",
+	          schemeDesignator: "DCM"
+	        }),
+	        value: options.physicalLocation,
+	        relationshipType: RelationshipTypes.HAS_OBS_CONTEXT
+	      });
+
+	      _this19.push(physicalLocationItem);
+	    }
+
+	    return _possibleConstructorReturn(_this19);
+	  }
+
+	  return SubjectContextDevice;
+	}(Template);
+
+	var LanguageOfContentItemAndDescendants =
+	/*#__PURE__*/
+	function (_Template13) {
+	  _inherits(LanguageOfContentItemAndDescendants, _Template13);
+
+	  function LanguageOfContentItemAndDescendants(options) {
+	    var _this20;
+
+	    _classCallCheck(this, LanguageOfContentItemAndDescendants);
+
+	    _this20 = _possibleConstructorReturn(this, _getPrototypeOf(LanguageOfContentItemAndDescendants).call(this));
+
+	    if (options.language === undefined) {
+	      options.language = new CodedConcept({
+	        value: "en-US",
+	        schemeDesignator: "RFC5646",
+	        meaning: "English (United States)"
+	      });
+	    }
+
+	    var languageItem = new CodeContentItem({
+	      name: new CodedConcept({
+	        value: "121049",
+	        meaning: "Language of Content Item and Descendants",
+	        schemeDesignator: "DCM"
+	      }),
+	      value: options.language,
+	      relationshipType: RelationshipTypes.HAS_CONCEPT_MOD
+	    });
+
+	    _this20.push(languageItem);
+
+	    return _this20;
+	  }
+
+	  return LanguageOfContentItemAndDescendants;
+	}(Template);
+
+	var _MeasurementsAndQualitatitiveEvaluations =
+	/*#__PURE__*/
+	function (_Template14) {
+	  _inherits(_MeasurementsAndQualitatitiveEvaluations, _Template14);
+
+	  function _MeasurementsAndQualitatitiveEvaluations(options) {
+	    var _groupItem$ContentSeq;
+
+	    var _this21;
+
+	    _classCallCheck(this, _MeasurementsAndQualitatitiveEvaluations);
+
+	    _this21 = _possibleConstructorReturn(this, _getPrototypeOf(_MeasurementsAndQualitatitiveEvaluations).call(this));
+	    var groupItem = new ContainerContentItem({
+	      name: new CodedConcept({
+	        value: "125007",
+	        meaning: "Measurement Group",
+	        schemeDesignator: "DCM"
+	      }),
+	      relationshipType: RelationshipTypes.CONTAINS
+	    });
+	    groupItem.ContentSequence = new ContentSequence$1();
+
+	    if (options.trackingIdentifier === undefined) {
+	      throw new Error("Option 'trackingIdentifier' is required for measurements group.");
+	    }
+
+	    if (options.trackingIdentifier.constructor !== TrackingIdentifier) {
+	      throw new Error("Option 'trackingIdentifier' must have type TrackingIdentifier.");
+	    }
+
+	    if (options.trackingIdentifier.length !== 2) {
+	      throw new Error("Option 'trackingIdentifier' must include a human readable tracking " + "identifier and a tracking unique identifier.");
+	    }
+
+	    (_groupItem$ContentSeq = groupItem.ContentSequence).push.apply(_groupItem$ContentSeq, _toConsumableArray(options.trackingIdentifier));
+
+	    if (options.session !== undefined) {
+	      var sessionItem = new TextContentItem({
+	        name: new CodedConcept({
+	          value: "C67447",
+	          meaning: "Activity Session",
+	          schemeDesignator: "NCIt"
+	        }),
+	        value: options.session,
+	        relationshipType: RelationshipTypes.HAS_OBS_CONTEXT
+	      });
+	      groupItem.ContentSequence.push(sessionItem);
+	    }
+
+	    if (options.findingType !== undefined) {
+	      var findingTypeItem = new CodeContentItem({
+	        name: new CodedConcept({
+	          value: "121071",
+	          meaning: "Finding",
+	          schemeDesignator: "DCM"
+	        }),
+	        value: options.findingType,
+	        relationshipType: RelationshipTypes.CONTAINS
+	      });
+	      groupItem.ContentSequence.push(findingTypeItem);
+	    }
+
+	    if (options.timePointContext !== undefined) {
+	      var _groupItem$ContentSeq2;
+
+	      if (options.timePointContext.constructor !== TimePointContext) {
+	        throw new Error("Option 'timePointContext' must have type TimePointContext.");
+	      }
+
+	      (_groupItem$ContentSeq2 = groupItem.ContentSequence).push.apply(_groupItem$ContentSeq2, _toConsumableArray(timePointContext));
+	    }
+
+	    if (options.referencedRealWorldValueMap !== undefined) {
+	      if (options.referencedRealWorldValueMap.constructor !== ReferencedRealWorldValueMap) {
+	        throw new Error("Option 'referencedRealWorldValleMap' must have type " + "ReferencedRealWorldValueMap.");
+	      }
+
+	      groupItem.ContentSequence.push(options.referencedRealWorldValueMap);
+	    }
+
+	    if (options.measurements !== undefined) {
+	      if (!(_typeof(options.measurements) === "object" || options.measurements instanceof Array)) {
+	        throw new Error("Option 'measurements' must have type Array.");
+	      }
+
+	      options.measurements.forEach(function (measurement) {
+	        console.log(measurement);
+
+	        if (!measurement || measurement.constructor !== NumContentItem) {
+	          throw new Error("Items of option 'measurement' must have type NumContentItem.");
+	        }
+
+	        groupItem.ContentSequence.push(measurement);
+	      });
+	    }
+
+	    if (options.qualitativeEvaluations !== undefined) {
+	      if (!(_typeof(options.qualitativeEvaluations) === "object" || options.qualitativeEvaluations instanceof Array)) {
+	        throw new Error("Option 'qualitativeEvaluations' must have type Array.");
+	      }
+
+	      options.qualitativeEvaluations.forEach(function (evaluation) {
+	        if (!evaluation || evaluation.constructor !== CodeContentItem) {
+	          throw new Error("Items of option 'qualitativeEvaluations' must have type " + "CodeContentItem.");
+	        }
+
+	        groupItem.ContentSequence.push(evaluation);
+	      });
+	    }
+
+	    _this21.push(groupItem);
+
+	    return _this21;
+	  }
+
+	  return _MeasurementsAndQualitatitiveEvaluations;
+	}(Template);
+
+	var _ROIMeasurementsAndQualitativeEvaluations =
+	/*#__PURE__*/
+	function (_MeasurementsAndQuali) {
+	  _inherits(_ROIMeasurementsAndQualitativeEvaluations, _MeasurementsAndQuali);
+
+	  function _ROIMeasurementsAndQualitativeEvaluations(options) {
+	    var _this22;
+
+	    _classCallCheck(this, _ROIMeasurementsAndQualitativeEvaluations);
+
+	    _this22 = _possibleConstructorReturn(this, _getPrototypeOf(_ROIMeasurementsAndQualitativeEvaluations).call(this, {
+	      trackingIdentifier: options.trackingIdentifier,
+	      timePointContext: options.timePointContext,
+	      findingType: options.findingType,
+	      session: options.session,
+	      measurements: options.measurements,
+	      qualitativeEvaluations: options.qualitativeEvaluations
+	    }));
+	    var groupItem = _this22[0];
+	    var wereReferencesProvided = [options.referencedRegions !== undefined, options.referencedVolume !== undefined, options.referencedSegmentation !== undefined];
+	    var numReferences = wereReferencesProvided.reduce(function (a, b) {
+	      return a + b;
+	    });
+
+	    if (numReferences === 0) {
+	      throw new Error("One of the following options must be provided: " + "'referencedRegions', 'referencedVolume', or " + "'referencedSegmentation'.");
+	    } else if (numReferences > 1) {
+	      throw new Error("Only one of the following options should be provided: " + "'referencedRegions', 'referencedVolume', or " + "'referencedSegmentation'.");
+	    }
+
+	    if (options.referencedRegions !== undefined) {
+	      if (!(_typeof(options.referencedRegions) === "object" || options.referencedRegions instanceof Array)) {
+	        throw new Error("Option 'referencedRegions' must have type Array.");
+	      }
+
+	      if (options.referencedRegions.length === 0) {
+	        throw new Error("Option 'referencedRegion' must have non-zero length.");
+	      }
+
+	      options.referencedRegions.forEach(function (region) {
+	        if (region === undefined || region.constructor !== ImageRegion && region.constructor !== ImageRegion3D) {
+	          throw new Error("Items of option 'referencedRegion' must have type " + "ImageRegion or ImageRegion3D.");
+	        }
+
+	        groupItem.ContentSequence.push(region);
+	      });
+	    } else if (options.referencedVolume !== undefined) {
+	      if (options.referencedVolume.constructor !== VolumeSurface) {
+	        throw new Error("Items of option 'referencedVolume' must have type VolumeSurface.");
+	      }
+
+	      groupItem.ContentSequence.push(referencedVolume);
+	    } else if (options.referencedSegmentation !== undefined) {
+	      if (options.referencedSegmentation.constructor !== ReferencedSegmentation && options.referencedSegmentation.constructor !== ReferencedSegmentationFrame) {
+	        throw new Error("Option 'referencedSegmentation' must have type " + "ReferencedSegmentation or ReferencedSegmentationFrame.");
+	      }
+
+	      groupItem.ContentSequence.push(referencedSegmentation);
+	    }
+
+	    _this22[0] = groupItem;
+	    return _this22;
+	  }
+
+	  return _ROIMeasurementsAndQualitativeEvaluations;
+	}(_MeasurementsAndQualitatitiveEvaluations);
+
+	var PlanarROIMeasurementsAndQualitativeEvaluations =
+	/*#__PURE__*/
+	function (_ROIMeasurementsAndQu) {
+	  _inherits(PlanarROIMeasurementsAndQualitativeEvaluations, _ROIMeasurementsAndQu);
+
+	  function PlanarROIMeasurementsAndQualitativeEvaluations(options) {
+	    _classCallCheck(this, PlanarROIMeasurementsAndQualitativeEvaluations);
+
+	    var wereReferencesProvided = [options.referencedRegion !== undefined, options.referencedSegmentation !== undefined];
+	    var numReferences = wereReferencesProvided.reduce(function (a, b) {
+	      return a + b;
+	    });
+
+	    if (numReferences === 0) {
+	      throw new Error("One of the following options must be provided: " + "'referencedRegion', 'referencedSegmentation'.");
+	    } else if (numReferences > 1) {
+	      throw new Error("Only one of the following options should be provided: " + "'referencedRegion', 'referencedSegmentation'.");
+	    }
+
+	    return _possibleConstructorReturn(this, _getPrototypeOf(PlanarROIMeasurementsAndQualitativeEvaluations).call(this, {
+	      trackingIdentifier: options.trackingIdentifier,
+	      referencedRegions: [options.referencedRegion],
+	      referencedSegmentation: options.referencedSegmentation,
+	      referencedRealWorldValueMap: options.referencedRealWorldValueMap,
+	      timePointContext: options.timePointContext,
+	      findingType: options.findingType,
+	      session: options.session,
+	      measurements: options.measurements,
+	      qualitativeEvaluations: options.qualitativeEvaluations
+	    }));
+	  }
+
+	  return PlanarROIMeasurementsAndQualitativeEvaluations;
+	}(_ROIMeasurementsAndQualitativeEvaluations);
+
+	var VolumetricROIMeasurementsAndQualitativeEvaluations =
+	/*#__PURE__*/
+	function (_ROIMeasurementsAndQu2) {
+	  _inherits(VolumetricROIMeasurementsAndQualitativeEvaluations, _ROIMeasurementsAndQu2);
+
+	  function VolumetricROIMeasurementsAndQualitativeEvaluations(options) {
+	    _classCallCheck(this, VolumetricROIMeasurementsAndQualitativeEvaluations);
+
+	    return _possibleConstructorReturn(this, _getPrototypeOf(VolumetricROIMeasurementsAndQualitativeEvaluations).call(this, {
+	      trackingIdentifier: options.trackingIdentifier,
+	      referencedRegions: options.referencedRegions,
+	      referencedSegmentation: options.referencedSegmentation,
+	      referencedRealWorldValueMap: options.referencedRealWorldValueMap,
+	      timePointContext: options.timePointContext,
+	      findingType: options.findingType,
+	      session: options.session,
+	      measurements: options.measurements,
+	      qualitativeEvaluations: options.qualitativeEvaluations
+	    }));
+	  }
+
+	  return VolumetricROIMeasurementsAndQualitativeEvaluations;
+	}(_ROIMeasurementsAndQualitativeEvaluations);
+
+	var MeasurementsDerivedFromMultipleROIMeasurements =
+	/*#__PURE__*/
+	function (_Template15) {
+	  _inherits(MeasurementsDerivedFromMultipleROIMeasurements, _Template15);
+
+	  function MeasurementsDerivedFromMultipleROIMeasurements(options) {
+	    var _this23;
+
+	    _classCallCheck(this, MeasurementsDerivedFromMultipleROIMeasurements);
+
+	    if (options.derivation === undefined) {
+	      throw new Error("Option 'derivation' is required for " + "MeasurementsDerivedFromMultipleROIMeasurements.");
+	    } // FIXME
+
+
+	    var valueItem = new NumContentItem({
+	      name: options.derivation
+	    });
+	    valueItem.ContentSequence = new ContentSequence$1();
+
+	    if (options.measurementGroups === undefined) {
+	      throw new Error("Option 'measurementGroups' is required for " + "MeasurementsDerivedFromMultipleROIMeasurements.");
+	    }
+
+	    if (!(_typeof(options.measurementGroups) === "object" || options.measurementGroups instanceof Array)) {
+	      throw new Error("Option 'measurementGroups' must have type Array.");
+	    }
+
+	    options.measurementGroups.forEach(function (group) {
+	      var _valueItem$ContentSeq4;
+
+	      if (!group || group.constructor !== PlanarROIMeasurementsAndQualitativeEvaluations && group.constructor !== VolumetricROIMeasurementsAndQualitativeEvaluations) {
+	        throw new Error("Items of option 'measurementGroups' must have type " + "PlanarROIMeasurementsAndQualitativeEvaluations or " + "VolumetricROIMeasurementsAndQualitativeEvaluations.");
+	      }
+
+	      group[0].RelationshipType = "R-INFERRED FROM";
+
+	      (_valueItem$ContentSeq4 = valueItem.ContentSequence).push.apply(_valueItem$ContentSeq4, _toConsumableArray(group));
+	    });
+
+	    if (options.measurementProperties !== undefined) {
+	      var _valueItem$ContentSeq5;
+
+	      if (options.measurementProperties.constructor !== MeasurementProperties) {
+	        throw new Error("Option 'measurementProperties' must have type MeasurementProperties.");
+	      }
+
+	      (_valueItem$ContentSeq5 = valueItem.ContentSequence).push.apply(_valueItem$ContentSeq5, _toConsumableArray(options.measurementProperties));
+	    }
+
+	    _this23.push(valueItem);
+
+	    return _possibleConstructorReturn(_this23);
+	  }
+
+	  return MeasurementsDerivedFromMultipleROIMeasurements;
+	}(Template);
+
+	var MeasurementAndQualitativeEvaluationGroup =
+	/*#__PURE__*/
+	function (_MeasurementsAndQuali2) {
+	  _inherits(MeasurementAndQualitativeEvaluationGroup, _MeasurementsAndQuali2);
+
+	  function MeasurementAndQualitativeEvaluationGroup(options) {
+	    _classCallCheck(this, MeasurementAndQualitativeEvaluationGroup);
+
+	    return _possibleConstructorReturn(this, _getPrototypeOf(MeasurementAndQualitativeEvaluationGroup).call(this, {
+	      trackingIdentifier: options.trackingIdentifier,
+	      referencedRealWorldValueMap: options.referencedRealWorldValueMap,
+	      timePointContext: options.timePointContext,
+	      findingType: options.findingType,
+	      session: options.session,
+	      measurements: options.measurements,
+	      qualitativeEvaluations: options.qualitativeEvaluations
+	    }));
+	  }
+
+	  return MeasurementAndQualitativeEvaluationGroup;
+	}(_MeasurementsAndQualitatitiveEvaluations);
+
+	var ROIMeasurements =
+	/*#__PURE__*/
+	function (_Template16) {
+	  _inherits(ROIMeasurements, _Template16);
+
+	  function ROIMeasurements(options) {
+	    var _this24;
+
+	    _classCallCheck(this, ROIMeasurements);
+
+	    _this24 = _possibleConstructorReturn(this, _getPrototypeOf(ROIMeasurements).call(this));
+
+	    if (options.method !== undefined) {
+	      var methodItem = new CodeContentItem({
+	        name: new CodedConcept({
+	          value: "370129005",
+	          meaning: "Measurement Method",
+	          schemeDesignator: "SCT"
+	        }),
+	        value: options.method,
+	        relationshipType: RelationshipTypes.HAS_CONCEPT_MOD
+	      });
+
+	      _this24.push(methodItem);
+	    }
+
+	    if (options.findingSites !== undefined) {
+	      if (!(_typeof(options.findingSites) === "object" || options.findingSites instanceof Array)) {
+	        throw new Error("Option 'findingSites' must have type Array.");
+	      }
+
+	      options.findingSites.forEach(function (site) {
+	        if (!site || site.constructor !== FindingSite) {
+	          throw new Error("Items of option 'findingSites' must have type FindingSite.");
+	        }
+
+	        _this24.push(site);
+	      });
+	    }
+
+	    if (options.measurements === undefined) {
+	      throw new Error("Options 'measurements' is required ROIMeasurements.");
+	    }
+
+	    if (!(_typeof(options.measurements) === "object" || options.measurements instanceof Array)) {
+	      throw new Error("Option 'measurements' must have type Array.");
+	    }
+
+	    if (options.measurements.length === 0) {
+	      throw new Error("Option 'measurements' must have non-zero length.");
+	    }
+
+	    options.measurements.forEach(function (measurement) {
+	      if (!measurement || measurement.constructor !== Measurement) {
+	        throw new Error("Items of option 'measurements' must have type Measurement.");
+	      }
+
+	      _this24.push(measurement);
+	    });
+	    return _this24;
+	  }
+
+	  return ROIMeasurements;
+	}(Template);
+
+	var MeasurementReport$2 =
+	/*#__PURE__*/
+	function (_Template17) {
+	  _inherits(MeasurementReport, _Template17);
+
+	  function MeasurementReport(options) {
+	    var _item$ContentSequence, _item$ContentSequence2, _item$ContentSequence3;
+
+	    var _this25;
+
+	    _classCallCheck(this, MeasurementReport);
+
+	    _this25 = _possibleConstructorReturn(this, _getPrototypeOf(MeasurementReport).call(this));
+
+	    if (options.observationContext === undefined) {
+	      throw new Error("Option 'observationContext' is required for MeasurementReport.");
+	    }
+
+	    if (options.procedureReported === undefined) {
+	      throw new Error("Option 'procedureReported' is required for MeasurementReport.");
+	    }
+
+	    var item = new ContainerContentItem({
+	      name: new CodedConcept({
+	        value: "126000",
+	        schemeDesignator: "DCM",
+	        meaning: "Imaging Measurement Report"
+	      }),
+	      templateID: "1500"
+	    });
+	    item.ContentSequence = new ContentSequence$1();
+
+	    if (options.languageOfContentItemAndDescendants === undefined) {
+	      throw new Error("Option 'languageOfContentItemAndDescendants' is required for " + "MeasurementReport.");
+	    }
+
+	    if (options.languageOfContentItemAndDescendants.constructor !== LanguageOfContentItemAndDescendants) {
+	      throw new Error("Option 'languageOfContentItemAndDescendants' must have type " + "LanguageOfContentItemAndDescendants.");
+	    }
+
+	    (_item$ContentSequence = item.ContentSequence).push.apply(_item$ContentSequence, _toConsumableArray(options.languageOfContentItemAndDescendants));
+
+	    (_item$ContentSequence2 = item.ContentSequence).push.apply(_item$ContentSequence2, _toConsumableArray(options.observationContext));
+
+	    if (options.procedureReported.constructor === CodedConcept || options.procedureReported.constructor === Code) {
+	      options.procedureReported = [options.procedureReported];
+	    }
+
+	    if (!(_typeof(options.procedureReported) === "object" || options.procedureReported instanceof Array)) {
+	      throw new Error("Option 'procedureReported' must have type Array.");
+	    }
+
+	    options.procedureReported.forEach(function (procedure) {
+	      var procedureItem = new CodeContentItem({
+	        name: new CodedConcept({
+	          value: "121058",
+	          meaning: "Procedure reported",
+	          schemeDesignator: "DCM"
+	        }),
+	        value: procedure,
+	        relationshipType: RelationshipTypes.HAS_CONCEPT_MOD
+	      });
+	      item.ContentSequence.push(procedureItem);
+	    });
+	    var imageLibraryItem = new ImageLibrary();
+
+	    (_item$ContentSequence3 = item.ContentSequence).push.apply(_item$ContentSequence3, _toConsumableArray(imageLibraryItem));
+
+	    var wereOptionsProvided = [options.imagingMeasurements !== undefined, options.derivedImagingMeasurements !== undefined, options.qualitativeEvaluations !== undefined];
+	    var numOptionsProvided = wereOptionsProvided.reduce(function (a, b) {
+	      return a + b;
+	    });
+
+	    if (numOptionsProvided > 1) {
+	      throw new Error("Only one of the following options should be provided: " + "'imagingMeasurements', 'derivedImagingMeasurement', " + "'qualitativeEvaluations'.");
+	    }
+
+	    if (options.imagingMeasurements !== undefined) {
+	      var containerItem = new ContainerContentItem({
+	        name: new CodedConcept({
+	          value: "126010",
+	          meaning: "Imaging Measurements",
+	          schemeDesignator: "DCM"
+	        }),
+	        relationshipType: RelationshipTypes.CONTAINS
+	      });
+	      containerItem.ContentSequence = _construct(ContentSequence$1, _toConsumableArray(options.imagingMeasurements));
+	      item.ContentSequence.push(containerItem);
+	    } else if (options.derivedImagingMeasurements !== undefined) {
+	      var _containerItem = new ContainerContentItem({
+	        name: new CodedConcept({
+	          value: "126011",
+	          meaning: "Derived Imaging Measurements",
+	          schemeDesignator: "DCM"
+	        }),
+	        relationshipType: RelationshipTypes.CONTAINS
+	      });
+
+	      _containerItem.ContentSequence = _construct(ContentSequence$1, _toConsumableArray(options.derivedImagingMeasurements));
+	      item.ContentSequence.push(_containerItem);
+	    } else if (options.qualitativeEvaluations !== undefined) {
+	      var _containerItem2 = new ContainerContentItem({
+	        name: new CodedConcept({
+	          value: "C0034375",
+	          meaning: "Qualitative Evaluations",
+	          schemeDesignator: "UMLS"
+	        }),
+	        relationshipType: RelationshipTypes.CONTAINS
+	      });
+
+	      _containerItem2.ContentSequence = _construct(ContentSequence$1, _toConsumableArray(options.qualitativeEvaluations));
+	      item.ContentSequence.push(_containerItem2);
+	    }
+
+	    _this25.push(item);
+
+	    return _this25;
+	  }
+
+	  return MeasurementReport;
+	}(Template);
+
+	var TimePointContext =
+	/*#__PURE__*/
+	function (_Template18) {
+	  _inherits(TimePointContext, _Template18);
+
+	  function TimePointContext(options) {
+	    var _this26;
+
+	    _classCallCheck(this, TimePointContext);
+
+	    if (options.timePoint === undefined) {
+	      throw new Error("Option 'timePoint' is required for TimePointContext.");
+	    }
+
+	    var timePointItem = new TextContentItem({
+	      name: new CodedConcept({
+	        value: "C2348792",
+	        meaning: "Time Point",
+	        schemeDesignator: "UMLS"
+	      }),
+	      value: options.timePoint,
+	      relationshipType: RelationshipTypes.HAS_OBS_CONTEXT
+	    });
+
+	    _this26.push(timePointItem);
+
+	    if (options.timePointType !== undefined) {
+	      var timePointTypeItem = new CodeContentItem({
+	        name: new CodedConcept({
+	          value: "126072",
+	          meaning: "Time Point Type",
+	          schemeDesignator: "DCM"
+	        }),
+	        value: options.timePointType,
+	        relationshipType: RelationshipTypes.HAS_OBS_CONTEXT
+	      });
+
+	      _this26.push(timePointTypeItem);
+	    }
+
+	    if (options.timePointOrder !== undefined) {
+	      var timePointOrderItem = new NumContentItem({
+	        name: new CodedConcept({
+	          value: "126073",
+	          meaning: "Time Point Order",
+	          schemeDesignator: "DCM"
+	        }),
+	        value: options.timePointOrder,
+	        relationshipType: RelationshipTypes.HAS_OBS_CONTEXT
+	      });
+
+	      _this26.push(timePointOrderItem);
+	    }
+
+	    if (options.subjectTimePointIdentifier !== undefined) {
+	      var subjectTimePointIdentifierItem = new NumContentItem({
+	        name: new CodedConcept({
+	          value: "126070",
+	          meaning: "Subject Time Point Identifier",
+	          schemeDesignator: "DCM"
+	        }),
+	        value: options.subjectTimePointIdentifier,
+	        relationshipType: RelationshipTypes.HAS_OBS_CONTEXT
+	      });
+
+	      _this26.push(subjectTimePointIdentifierItem);
+	    }
+
+	    if (options.protocolTimePointIdentifier !== undefined) {
+	      var protocolTimePointIdentifierItem = new NumContentItem({
+	        name: new CodedConcept({
+	          value: "126071",
+	          meaning: "Protocol Time Point Identifier",
+	          schemeDesignator: "DCM"
+	        }),
+	        value: options.protocolTimePointIdentifier,
+	        relationshipType: RelationshipTypes.HAS_OBS_CONTEXT
+	      });
+
+	      _this26.push(protocolTimePointIdentifierItem);
+	    }
+
+	    if (options.temporalOffsetFromEvent !== undefined) {
+	      if (options.temporalOffsetFromEvent.constructor !== LongitudinalTemporalOffsetFromEventContentItem) {
+	        throw new Error("Option 'temporalOffsetFromEvent' must have type " + "LongitudinalTemporalOffsetFromEventContentItem.");
+	      }
+
+	      _this26.push(temporalOffsetFromEvent);
+	    }
+
+	    return _possibleConstructorReturn(_this26);
+	  }
+
+	  return TimePointContext;
+	}(Template);
+
+	var ImageLibrary =
+	/*#__PURE__*/
+	function (_Template19) {
+	  _inherits(ImageLibrary, _Template19);
+
+	  function ImageLibrary(options) {
+	    var _this27;
+
+	    _classCallCheck(this, ImageLibrary);
+
+	    _this27 = _possibleConstructorReturn(this, _getPrototypeOf(ImageLibrary).call(this));
+	    var libraryItem = new ContainerContentItem({
+	      name: new CodedConcept({
+	        value: "111028",
+	        meaning: "Image Library",
+	        schemeDesignator: "DCM"
+	      }),
+	      relationshipType: RelationshipTypes.CONTAINS
+	    });
+
+	    _this27.push(libraryItem);
+
+	    return _this27;
+	  }
+
+	  return ImageLibrary;
+	}(Template);
+
+	var AlgorithmIdentification =
+	/*#__PURE__*/
+	function (_Template20) {
+	  _inherits(AlgorithmIdentification, _Template20);
+
+	  function AlgorithmIdentification(options) {
+	    var _this28;
+
+	    _classCallCheck(this, AlgorithmIdentification);
+
+	    _this28 = _possibleConstructorReturn(this, _getPrototypeOf(AlgorithmIdentification).call(this));
+
+	    if (options.name === undefined) {
+	      throw new Error("Option 'name' is required for AlgorithmIdentification.");
+	    }
+
+	    if (options.version === undefined) {
+	      throw new Error("Option 'version' is required for AlgorithmIdentification.");
+	    }
+
+	    var nameItem = new TextContentItem({
+	      name: new CodedConcept({
+	        value: "111001",
+	        meaning: "Algorithm Name",
+	        schemeDesignator: "DCM"
+	      }),
+	      value: options.name,
+	      relationshipType: RelationshipTypes.HAS_CONCEPT_MOD
+	    });
+
+	    _this28.push(nameItem);
+
+	    var versionItem = new TextContentItem({
+	      name: new CodedConcept({
+	        value: "111003",
+	        meaning: "Algorithm Version",
+	        schemeDesignator: "DCM"
+	      }),
+	      value: options.version,
+	      relationshipType: RelationshipTypes.HAS_CONCEPT_MOD
+	    });
+
+	    _this28.push(versionItem);
+
+	    if (options.parameters !== undefined) {
+	      if (!(_typeof(options.parameters) === "object" || options.parameters instanceof Array)) {
+	        throw new Error("Option 'parameters' must have type Array.");
+	      }
+
+	      options.parameters.forEach(function (parameter) {
+	        var parameterItem = new TextContentItem({
+	          name: new CodedConcept({
+	            value: "111002",
+	            meaning: "Algorithm Parameter",
+	            schemeDesignator: "DCM"
+	          }),
+	          value: param,
+	          relationshipType: RelationshipTypes.HAS_CONCEPT_MOD
+	        });
+
+	        _this28.push(parameterItem);
+	      });
+	    }
+
+	    return _this28;
+	  }
+
+	  return AlgorithmIdentification;
+	}(Template);
+
+	var TrackingIdentifier =
+	/*#__PURE__*/
+	function (_Template21) {
+	  _inherits(TrackingIdentifier, _Template21);
+
+	  function TrackingIdentifier(options) {
+	    var _this29;
+
+	    _classCallCheck(this, TrackingIdentifier);
+
+	    _this29 = _possibleConstructorReturn(this, _getPrototypeOf(TrackingIdentifier).call(this));
+
+	    if (options.uid === undefined) {
+	      throw new Error("Option 'uid' is required for TrackingIdentifier.");
+	    }
+
+	    if (options.identifier !== undefined) {
+	      var trackingIdentifierItem = new TextContentItem({
+	        name: new CodedConcept({
+	          value: "112039",
+	          meaning: "Tracking Identifier",
+	          schemeDesignator: "DCM"
+	        }),
+	        value: options.identifier,
+	        relationshipType: RelationshipTypes.HAS_OBS_CONTEXT
+	      });
+
+	      _this29.push(trackingIdentifierItem);
+	    }
+
+	    var trackingUIDItem = new UIDRefContentItem({
+	      name: new CodedConcept({
+	        value: "112040",
+	        meaning: "Tracking Unique Identifier",
+	        schemeDesignator: "DCM"
+	      }),
+	      value: options.uid,
+	      relationshipType: RelationshipTypes.HAS_OBS_CONTEXT
+	    });
+
+	    _this29.push(trackingUIDItem);
+
+	    return _this29;
+	  }
+
+	  return TrackingIdentifier;
+	}(Template);
+
+	var templates = /*#__PURE__*/Object.freeze({
+		__proto__: null,
+		AlgorithmIdentification: AlgorithmIdentification,
+		DeviceObserverIdentifyingAttributes: DeviceObserverIdentifyingAttributes,
+		ImageLibrary: ImageLibrary,
+		LanguageOfContentItemAndDescendants: LanguageOfContentItemAndDescendants,
+		Measurement: Measurement,
+		MeasurementAndQualitativeEvaluationGroup: MeasurementAndQualitativeEvaluationGroup,
+		MeasurementReport: MeasurementReport$2,
+		MeasurementsDerivedFromMultipleROIMeasurements: MeasurementsDerivedFromMultipleROIMeasurements,
+		ObservationContext: ObservationContext,
+		ObserverContext: ObserverContext,
+		PersonObserverIdentifyingAttributes: PersonObserverIdentifyingAttributes,
+		PlanarROIMeasurementsAndQualitativeEvaluations: PlanarROIMeasurementsAndQualitativeEvaluations,
+		ROIMeasurements: ROIMeasurements,
+		SubjectContext: SubjectContext,
+		SubjectContextDevice: SubjectContextDevice,
+		SubjectContextFetus: SubjectContextFetus,
+		SubjectContextSpecimen: SubjectContextSpecimen,
+		TimePointContext: TimePointContext,
+		TrackingIdentifier: TrackingIdentifier,
+		VolumetricROIMeasurementsAndQualitativeEvaluations: VolumetricROIMeasurementsAndQualitativeEvaluations
+	});
+
+	var _attributesToInclude = [// Patient
+	"00080054", "00080100", "00080102", "00080103", "00080104", "00080105", "00080106", "00080107", "0008010B", "0008010D", "0008010F", "00080117", "00080118", "00080119", "00080120", "00080121", "00080122", "00081120", "00081150", "00081155", "00081160", "00081190", "00081199", "00100010", "00100020", "00100021", "00100022", "00100024", "00100026", "00100027", "00100028", "00100030", "00100032", "00100033", "00100034", "00100035", "00100040", "00100200", "00100212", "00100213", "00100214", "00100215", "00100216", "00100217", "00100218", "00100219", "00100221", "00100222", "00100223", "00100229", "00101001", "00101002", "00101100", "00102160", "00102201", "00102202", "00102292", "00102293", "00102294", "00102295", "00102296", "00102297", "00102298", "00102299", "00104000", "00120062", "00120063", "00120064", "0020000D", "00400031", "00400032", "00400033", "00400035", "00400036", "00400039", "0040003A", "0040E001", "0040E010", "0040E020", "0040E021", "0040E022", "0040E023", "0040E024", "0040E025", "0040E030", "0040E031", "0062000B", "00880130", "00880140", // Patient Study
+	"00080100", "00080102", "00080103", "00080104", "00080105", "00080106", "00080107", "0008010B", "0008010D", "0008010F", "00080117", "00080118", "00080119", "00080120", "00080121", "00080122", "00081080", "00081084", "00101010", "00101020", "00101021", "00101022", "00101023", "00101024", "00101030", "00102000", "00102110", "00102180", "001021A0", "001021B0", "001021C0", "001021D0", "00102203", "00380010", "00380014", "00380060", "00380062", "00380064", "00380500", "00400031", "00400032", "00400033", // General Study
+	"00080020", "00080030", "00080050", "00080051", "00080080", "00080081", "00080082", "00080090", "00080096", "0008009C", "0008009D", "00080100", "00080102", "00080103", "00080104", "00080105", "00080106", "00080107", "0008010B", "0008010D", "0008010F", "00080117", "00080118", "00080119", "00080120", "00080121", "00080122", "00081030", "00081032", "00081048", "00081049", "00081060", "00081062", "00081110", "00081150", "00081155", "0020000D", "00200010", "00321034", "00400031", "00400032", "00400033", "00401012", "00401101", "00401102", "00401103", "00401104", // Clinical Trial Subject
+	"00120010", "00120020", "00120021", "00120030", "00120031", "00120040", "00120042", "00120081", "00120082", // Clinical Trial Study
+	"00120020", "00120050", "00120051", "00120052", "00120053", "00120083", "00120084", "00120085"];
+
+	var Comprehensive3DSR = function Comprehensive3DSR(options) {
+	  var _this = this;
+
+	  _classCallCheck(this, Comprehensive3DSR);
+
+	  if (options.evidence === undefined) {
+	    throw new Error("Option 'evidence' is required for Comprehensive3DSR.");
+	  }
+
+	  if (!(_typeof(options.evidence) === "object" || options.evidence instanceof Array)) {
+	    throw new Error("Option 'evidence' must have type Array.");
+	  }
+
+	  if (options.evidence.length === 0) {
+	    throw new Error("Option 'evidence' must have non-zero length.");
+	  }
+
+	  if (options.content === undefined) {
+	    throw new Error("Option 'content' is required for Comprehensive3DSR.");
+	  }
+
+	  if (options.seriesInstanceUID === undefined) {
+	    throw new Error("Option 'seriesInstanceUID' is required for Comprehensive3DSR.");
+	  }
+
+	  if (options.seriesNumber === undefined) {
+	    throw new Error("Option 'seriesNumber' is required for Comprehensive3DSR.");
+	  }
+
+	  if (options.seriesDescription === undefined) {
+	    throw new Error("Option 'seriesDescription' is required for Comprehensive3DSR.");
+	  }
+
+	  if (options.sopInstanceUID === undefined) {
+	    throw new Error("Option 'sopInstanceUID' is required for Comprehensive3DSR.");
+	  }
+
+	  if (options.instanceNumber === undefined) {
+	    throw new Error("Option 'instanceNumber' is required for Comprehensive3DSR.");
+	  }
+
+	  if (options.manufacturer === undefined) {
+	    throw new Error("Option 'manufacturer' is required for Comprehensive3DSR.");
+	  }
+
+	  this.SOPClassUID = "1.2.840.10008.5.1.4.1.1.88.34";
+	  this.SOPInstanceUID = options.sopInstanceUID;
+	  this.Modality = "SR";
+	  this.SeriesDescription = options.seriesDescription;
+	  this.SeriesInstanceUID = options.seriesInstanceUID;
+	  this.SeriesNumber = options.seriesNumber;
+	  this.InstanceNumber = options.instanceNumber;
+	  this.Manufacturer = options.manufacturer;
+
+	  if (options.institutionName !== undefined) {
+	    this.InstitutionName = options.institutionName;
+
+	    if (options.institutionalDepartmentName !== undefined) {
+	      this.InstitutionalDepartmentName = options.institutionDepartmentName;
+	    }
+	  }
+
+	  if (options.isComplete) {
+	    this.CompletionFlag = "COMPLETE";
+	  } else {
+	    this.CompletionFlag = "PARTIAL";
+	  }
+
+	  if (options.isVerified) {
+	    if (options.verifyingObserverName === undefined) {
+	      throw new Error("Verifying Observer Name must be specified if SR document " + "has been verified.");
+	    }
+
+	    if (options.verifyingOrganization === undefined) {
+	      throw new Error("Verifying Organization must be specified if SR document " + "has been verified.");
+	    }
+
+	    this.VerificationFlag = "VERIFIED";
+	    var ovserver_item = {};
+	    ovserver_item.VerifyingObserverName = options.verifyingObserverName;
+	    ovserver_item.VerifyingOrganization = options.verifyingOrganization;
+	    ovserver_item.VerificationDateTime = DicomMetaDictionary.dateTime();
+	    this.VerifyingObserverSequence = [observer_item];
+	  } else {
+	    this.VerificationFlag = "UNVERIFIED";
+	  }
+
+	  if (options.isFinal) {
+	    this.PreliminaryFlag = "FINAL";
+	  } else {
+	    this.PreliminaryFlag = "PRELIMINARY";
+	  }
+
+	  this.ContentDate = DicomMetaDictionary.date();
+	  this.ContentTime = DicomMetaDictionary.time();
+	  Object.keys(options.content).forEach(function (keyword) {
+	    _this[keyword] = options.content[keyword];
+	  });
+	  var evidenceCollection = {};
+	  options.evidence.forEach(function (evidence) {
+	    if (evidence.StudyInstanceUID !== options.evidence[0].StudyInstanceUID) {
+	      throw new Error("Referenced data sets must all belong to the same study.");
+	    }
+
+	    if (!(evidence.SeriesInstanceUID in evidenceCollection)) {
+	      evidenceCollection[evidence.SeriesInstanceUID] = [];
+	    }
+
+	    var instanceItem = {};
+	    instanceItem.ReferencedSOPClassUID = evidence.SOPClassUID;
+	    instanceItem.ReferencedSOPInstanceUID = evidence.SOPInstanceUID;
+	    evidenceCollection[evidence.SeriesInstanceUID].push(instanceItem);
+	  });
+	  var evidenceStudyItem = {};
+	  evidenceStudyItem.StudyInstanceUID = options.evidence[0].StudyInstanceUID;
+	  evidenceStudyItem.ReferencedSeriesSequence = [];
+	  Object.keys(evidenceCollection).forEach(function (seriesInstanceUID) {
+	    var seriesItem = {};
+	    seriesItem.SeriesInstanceUID = seriesInstanceUID;
+	    seriesItem.ReferencedSOPSequence = evidenceCollection[seriesInstanceUID];
+	    evidenceStudyItem.ReferencedSeriesSequence.push(seriesItem);
+	  });
+
+	  if (options.requestedProcedures !== undefined) {
+	    if (!(_typeof(options.requestedProcedures) === "object" || options.requestedProcedures instanceof Array)) {
+	      throw new Error("Option 'requestedProcedures' must have type Array.");
+	    }
+
+	    this.ReferencedRequestSequence = _construct(ContentSequence, _toConsumableArray(options.requestedProcedures));
+	    this.CurrentRequestedProcedureEvidenceSequence = [evidenceStudyItem];
+	  } else {
+	    this.PertinentOtherEvidenceSequence = [evidenceStudyItem];
+	  }
+
+	  if (options.previousVersions !== undefined) {
+	    var preCollection = {};
+	    options.previousVersions.forEach(function (version) {
+	      if (version.StudyInstanceUID != options.evidence[0].StudyInstanceUID) {
+	        throw new Error("Previous version data sets must belong to the same study.");
+	      }
+
+	      var instanceItem = {};
+	      instanceItem.ReferencedSOPClassUID = version.SOPClassUID;
+	      instanceItem.ReferencedSOPInstanceUID = version.SOPInstanceUID;
+	      preCollection[version.SeriesInstanceUID].push(instanceItem);
+	    });
+	    var preStudyItem = {};
+	    preStudyItem.StudyInstanceUID = options.previousVersions[0].StudyInstanceUID;
+	    preStudyItem.ReferencedSeriesSequence = [];
+	    Object.keys(preCollection).forEach(function (seriesInstanceUID) {
+	      var seriesItem = {};
+	      seriesItem.SeriesInstanceUID = seriesInstanceUID;
+	      seriesItem.ReferencedSOPSequence = preCollection[seriesInstanceUID];
+	      preStudyItem.ReferencedSeriesSequence.push(seriesItem);
+	    });
+	    this.PredecessorDocumentsSequence = [preStudyItem];
+	  }
+
+	  if (options.performedProcedureCodes !== undefined) {
+	    if (!(_typeof(options.performedProcedureCodes) === "object" || options.performedProcedureCodes instanceof Array)) {
+	      throw new Error("Option 'performedProcedureCodes' must have type Array.");
+	    }
+
+	    this.PerformedProcedureCodeSequence = _construct(ContentSequence, _toConsumableArray(options.performedProcedureCodes));
+	  } else {
+	    this.PerformedProcedureCodeSequence = [];
+	  }
+
+	  this.ReferencedPerformedProcedureStepSequence = [];
+
+	  _attributesToInclude.forEach(function (tag) {
+	    var key = DicomMetaDictionary.punctuateTag(tag);
+	    var element = DicomMetaDictionary.dictionary[key];
+
+	    if (element !== undefined) {
+	      var keyword = element.name;
+	      var value = options.evidence[0][keyword];
+
+	      if (value !== undefined) {
+	        _this[keyword] = value;
+	      }
+	    }
+	  });
+	};
+
+	var documents = /*#__PURE__*/Object.freeze({
+		__proto__: null,
+		Comprehensive3DSR: Comprehensive3DSR
+	});
+
+	var sr = {
+	  coding: coding,
+	  contentItems: contentItems,
+	  documents: documents,
+	  templates: templates,
+	  valueTypes: valueTypes
+	};
+
+	// Data
 	var data = {
 	  BitArray: BitArray,
 	  ReadBufferStream: ReadBufferStream,
@@ -7187,15 +11626,26 @@ b"+i+"*=d\
 	  SEGImageNormalizer: SEGImageNormalizer,
 	  DSRNormalizer: DSRNormalizer
 	};
+	var dcmjs = {
+	  DICOMWEB: DICOMWEB,
+	  adapters: adapters,
+	  data: data,
+	  derivations: derivations,
+	  normalizers: normalizers,
+	  sr: sr,
+	  utilities: utilities
+	};
 
+	exports.DICOMWEB = DICOMWEB;
+	exports.adapters = adapters;
 	exports.data = data;
+	exports.default = dcmjs;
 	exports.derivations = derivations;
 	exports.normalizers = normalizers;
-	exports.adapters = adapters;
+	exports.sr = sr;
 	exports.utilities = utilities;
-	exports.DICOMWEB = DICOMWEB;
 
 	Object.defineProperty(exports, '__esModule', { value: true });
 
-}));
+})));
 //# sourceMappingURL=dcmjs.js.map
