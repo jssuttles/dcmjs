@@ -711,6 +711,11 @@ class SequenceOfItems extends ValueRepresentation {
                                 } else if (ge === 0xe000) {
                                     stack++;
                                     toRead += 4;
+                                    var itemLength = stream.readUint32();
+                                    stream.increment(-4);
+                                    if (itemLength === 0) {
+                                        stack--;
+                                    }
                                 } else {
                                     toRead += 2;
                                     stream.increment(-2);
