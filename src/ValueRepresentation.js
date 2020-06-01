@@ -154,7 +154,9 @@ class ValueRepresentation {
                 checklen = lengths[i],
                 isString = false,
                 displaylen = checklen;
-            if (this.checkLength) {
+            if (checkValue === null) {
+                valid = true;
+            } else if (this.checkLength) {
                 valid = this.checkLength(checkValue);
             } else if (this.maxCharLength) {
                 var check = this.maxCharLength; //, checklen = checkValue.length;
@@ -253,7 +255,7 @@ class StringRepresentation extends ValueRepresentation {
     }
 
     writeBytes(stream, value) {
-        var written = super.write(stream, "String", value);
+        const written = super.write(stream, "String", value);
 
         return super.writeBytes(stream, value, written);
     }
@@ -479,6 +481,10 @@ class DecimalString extends StringRepresentation {
 
         return ds;
     }
+
+    writeBytes(stream, value) {
+        return super.writeBytes(stream, value.map(String));
+    }
 }
 
 class DateTime extends StringRepresentation {
@@ -552,6 +558,10 @@ class IntegerString extends StringRepresentation {
         }
 
         return is;
+    }
+
+    writeBytes(stream, value) {
+        return super.writeBytes(stream, value.map(String));
     }
 }
 
