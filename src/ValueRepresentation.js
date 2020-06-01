@@ -698,29 +698,37 @@ class SequenceOfItems extends ValueRepresentation {
                         while (1) {
                             var g = stream.readUint16();
                             if (g === 0xfffe) {
+                                // some control tag is about to be read
                                 var ge = stream.readUint16();
                                 if (ge === 0xe00d) {
+                                    // item delimitation tag has been read
                                     stack--;
                                     if (stack < 0) {
+                                        // if we are outside every stack, then we are finished reading the sequence of items
                                         stream.increment(4);
                                         read += 8;
                                         break;
                                     } else {
+                                        // otherwise, we were in a nested sequence of items
                                         toRead += 4;
                                     }
                                 } else if (ge === 0xe000) {
+                                    // a new item has been found
                                     stack++;
                                     toRead += 4;
                                     var itemLength = stream.readUint32();
                                     stream.increment(-4);
                                     if (itemLength === 0) {
+                                        // in some odd cases, DICOMs rely on the length being zero to denote that the item has closed
                                         stack--;
                                     }
                                 } else {
+                                    // some control tag that does not concern sequence of items has been read
                                     toRead += 2;
                                     stream.increment(-2);
                                 }
                             } else {
+                                // anything else has been read
                                 toRead += 2;
                             }
                         }
