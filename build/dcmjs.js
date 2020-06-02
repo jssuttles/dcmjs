@@ -3085,6 +3085,72 @@
 	        };
 	      }
 	    }
+	    /**
+	     * Given a tag, return a single value from that tag
+	     * @param {String} tag
+	     * @return {String}
+	     */
+
+	  }, {
+	    key: "getValue",
+	    value: function getValue(tag) {
+	      var tagObject = null;
+
+	      if (tag in this.dict) {
+	        tagObject = this.dict[tag];
+	      } else if (tag in this.meta) {
+	        tagObject = this.meta[tag];
+	      } else {
+	        return '';
+	      }
+
+	      if (!tagObject.Value || !tagObject.Value.length) {
+	        return '';
+	      }
+
+	      if (typeof tagObject.Value === 'string') {
+	        return tagObject.Value;
+	      }
+
+	      if (Array.isArray(tagObject.Value)) {
+	        return tagObject.Value[0];
+	      }
+
+	      return '';
+	    }
+	    /**
+	     * Given a tag, return all values from that tag
+	     * @param {String} tag
+	     * @return {(Object|String)[]}
+	     */
+
+	  }, {
+	    key: "getValues",
+	    value: function getValues(tag) {
+	      var tagObject = null;
+
+	      if (tag in this.dict) {
+	        tagObject = this.dict[tag];
+	      } else if (tag in this.meta) {
+	        tagObject = this.meta[tag];
+	      } else {
+	        return [];
+	      }
+
+	      if (!tagObject.Value || !tagObject.Value.length) {
+	        return [];
+	      }
+
+	      if (typeof tagObject.Value === 'string') {
+	        return [tagObject.Value];
+	      }
+
+	      if (Array.isArray(tagObject.Value)) {
+	        return tagObject.Value;
+	      }
+
+	      return [];
+	    }
 	  }, {
 	    key: "write",
 	    value: function write() {
