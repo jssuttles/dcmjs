@@ -1815,11 +1815,11 @@
 	        // where components ("Alphabetic", "Ideographic", "Phonetic")
 	        // are separated by the "=" delimeter.
 	        // http://dicom.nema.org/medical/dicom/current/output/chtml/part05/sect_6.2.html
-	        components = value.split(/\=/);
+	        components = value.split(/=/);
 	      }
 
 	      for (var i in components) {
-	        if (cmps.hasOwnProperty(i)) {
+	        if (components.hasOwnProperty(i)) {
 	          var cmp = components[i];
 	          if (cmp.length > 64) return false;
 	        }
@@ -3101,14 +3101,14 @@
 	      } else if (tag in this.meta) {
 	        tagObject = this.meta[tag];
 	      } else {
-	        return '';
+	        return "";
 	      }
 
 	      if (!tagObject.Value || !tagObject.Value.length) {
-	        return '';
+	        return "";
 	      }
 
-	      if (typeof tagObject.Value === 'string') {
+	      if (typeof tagObject.Value === "string") {
 	        return tagObject.Value;
 	      }
 
@@ -3116,7 +3116,7 @@
 	        return tagObject.Value[0];
 	      }
 
-	      return '';
+	      return "";
 	    }
 	    /**
 	     * Given a tag, return all values from that tag
@@ -3141,7 +3141,7 @@
 	        return [];
 	      }
 
-	      if (typeof tagObject.Value === 'string') {
+	      if (typeof tagObject.Value === "string") {
 	        return [tagObject.Value];
 	      }
 
