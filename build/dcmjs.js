@@ -1216,9 +1216,11 @@
 
 	      var written = total;
 
-	      if (total & 1) {
-	        stream.writeHex(this.padByte);
-	        written++;
+	      if (!this.doNotPad) {
+	        if (total & 1) {
+	          stream.writeHex(this.padByte);
+	          written++;
+	        }
 	      }
 
 	      return written;
@@ -2311,6 +2313,8 @@
 
 	    _this28 = _possibleConstructorReturn(this, _getPrototypeOf(UnknownValue).call(this, "UN"));
 	    _this28.maxLength = null;
+	    _this28.doNotPad = true; // Medicom specific
+
 	    _this28.noMultiple = true;
 	    return _this28;
 	  }

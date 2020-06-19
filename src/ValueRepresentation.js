@@ -186,9 +186,11 @@ class ValueRepresentation {
 
         //check for odd
         var written = total;
-        if (total & 1) {
-            stream.writeHex(this.padByte);
-            written++;
+        if (!this.doNotPad) {
+            if (total & 1) {
+                stream.writeHex(this.padByte);
+                written++;
+            }
         }
         return written;
     }
@@ -921,6 +923,7 @@ class UnknownValue extends BinaryRepresentation {
     constructor() {
         super("UN");
         this.maxLength = null;
+        this.doNotPad = true; // Medicom specific
         this.noMultiple = true;
     }
 }
